@@ -1,0 +1,117 @@
+/*
+  Kraft Configurator — theme tokens
+  Direction: deep-space dark UI, brushed violet-metal accents, launch-telemetry
+  overlay details (corner brackets, scan lines, mono readouts). Reference points:
+  Porsche configurator (layout/interaction model) crossed with SpaceX webcast HUD
+  (typography, overlay chrome).
+*/
+
+:root {
+  /* --- color --- */
+  --void: #06060a;            /* page background, deep space */
+  --panel: #111018;           /* raised surface (cards, side panel) */
+  --panel-raised: #181722;    /* hover/active surface */
+  --line: rgba(167, 139, 250, 0.16); /* hairline dividers / grid */
+  --line-strong: rgba(167, 139, 250, 0.32);
+
+  --purple-300: #c4b5fd;      /* highlight / glow */
+  --purple-500: #8b5cf6;      /* primary accent */
+  --purple-700: #5b21b6;      /* pressed / deep accent */
+  --purple-900: #2e1065;      /* metallic shadow, gradient base */
+  --metal-silver: #9a9aa6;    /* cool brushed-metal counterpoint to purple */
+
+  --text-primary: #f4f3f8;
+  --text-secondary: #8d8b9b;
+  --text-tertiary: #5d5b6b;
+
+  --success: #34d399;
+  --danger: #f87171;
+
+  /* brushed-metal gradient used sparingly on primary surfaces/buttons */
+  --gradient-metal: linear-gradient(135deg, #2e1065 0%, #5b21b6 45%, #8b5cf6 70%, #4c1d95 100%);
+
+  /* --- type --- */
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* --- layout --- */
+  --radius-sm: 4px;
+  --radius-md: 10px;
+  --radius-lg: 18px;
+}
+:root[data-theme="light"] {
+  --void: #f4f3f8;
+  --panel: #ffffff;
+  --panel-raised: #ece9f5;
+  --line: rgba(91, 33, 182, 0.14);
+  --line-strong: rgba(91, 33, 182, 0.3);
+
+  --purple-300: #7c3aed;
+  --purple-500: #6d28d9;
+  --purple-700: #5b21b6;
+  --purple-900: #ede9fe;
+  --metal-silver: #6b6b76;
+
+  --text-primary: #17151f;
+  --text-secondary: #4a4757;
+  --text-tertiary: #7d7a8a;
+
+  --gradient-metal: linear-gradient(135deg, #ddd6fe 0%, #a78bfa 45%, #7c3aed 70%, #4c1d95 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--void);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* Visible keyboard focus everywhere — don't rely on browser default inside dark UI */
+:focus-visible {
+  outline: 2px solid var(--purple-300);
+  outline-offset: 2px;
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+

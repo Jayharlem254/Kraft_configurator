@@ -1,0 +1,28 @@
+# Python / Django
+backend/.venv/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+backend/db.sqlite3
+backend/.env
+backend/media/
+
+# Node / Svelte
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
+# Java / Maven
+asset-pipeline/target/
+asset-pipeline/raw-assets/*
+!asset-pipeline/raw-assets/.gitkeep
+
+# Shared media
+media/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
