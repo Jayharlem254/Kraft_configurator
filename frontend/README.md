@@ -9,7 +9,7 @@ scanline) around the 3D viewport.
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173, proxies /api and /media to Django on :8000
+npm run dev      
 ```
 
 If the Django backend isn't running yet, or has no published vehicles, the app falls
