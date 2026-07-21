@@ -8,6 +8,16 @@
     if (Number.isNaN(num)) return "—";
     return num.toLocaleString("en-US", { maximumFractionDigits: 0 });
   }
+
+  // Cursor-tracked spotlight on each card — position fed in as CSS vars and
+  // painted with a radial-gradient in the stylesheet, so this stays a plain
+  // style update rather than anything that re-triggers Svelte reactivity per
+  // mouse-move.
+  function trackPointer(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty("--mx", `${e.clientX - rect.left}px`);
+    e.currentTarget.style.setProperty("--my", `${e.clientY - rect.top}px`);
+  }
 </script>
 
 <div class="gallery">
@@ -17,13 +27,27 @@
   </div>
 
   {#if loading}
-    <p class="mono-label state">LOADING CATALOG…</p>
+    <div class="grid" aria-hidden="true">
+      {#each { length: 8 } as _}
+        <div class="card skeleton">
+          <div class="thumb"></div>
+          <div class="meta">
+            <div class="row">
+              <span class="skel-line title"></span>
+              <span class="skel-line price"></span>
+            </div>
+            <span class="skel-line tagline"></span>
+          </div>
+        </div>
+      {/each}
+    </div>
   {:else if vehicles.length === 0}
     <p class="mono-label state">NO VEHICLES PUBLISHED YET — CHECK THE DJANGO ADMIN</p>
   {:else}
     <div class="grid">
       {#each vehicles as v (v.slug)}
-        <button class="card" on:click={() => onSelect(v)}>
+        <button class="card" on:click={() => onSelect(v)} on:pointermove={trackPointer}>
+          <div class="glow" aria-hidden="true"></div>
           <div class="thumb">
             {#if v.thumbnail}
               <img src={v.thumbnail} alt={v.name} loading="lazy" />
@@ -85,6 +109,7 @@
   }
 
   .card {
+    position: relative;
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
@@ -98,6 +123,66 @@
     border-color: var(--purple-500);
     transform: translateY(-3px);
     box-shadow: 0 12px 30px -12px rgba(139, 92, 246, 0.45);
+  }
+
+  /* Cursor-tracked spotlight — --mx/--my set from pointermove in the script */
+  .glow {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s;
+    background: radial-gradient(
+      280px circle at var(--mx, 50%) var(--my, 50%),
+      rgba(139, 92, 246, 0.16),
+      transparent 70%
+    );
+  }
+  .card:hover .glow {
+    opacity: 1;
+  }
+
+  .skeleton {
+    cursor: default;
+  }
+  .skeleton .thumb {
+    background: linear-gradient(90deg, #100f17 0%, #1c1a29 50%, #100f17 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+  .skel-line {
+    display: block;
+    height: 12px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #14121d 0%, #221f30 50%, #14121d 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+  .skel-line.title {
+    width: 55%;
+    height: 15px;
+  }
+  .skel-line.price {
+    width: 20%;
+  }
+  .skel-line.tagline {
+    width: 80%;
+    margin-top: 10px;
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton .thumb,
+    .skel-line {
+      animation: none;
+    }
   }
 
   .thumb {

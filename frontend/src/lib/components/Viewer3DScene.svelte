@@ -3,6 +3,7 @@
   import { T } from "@threlte/core";
   import { OrbitControls, GLTF, HTML, Billboard, interactivity } from "@threlte/extras";
   import PlaceholderVehicle from "./PlaceholderVehicle.svelte";
+  import { effectiveSelections } from "../selections.js";
 
   /**
    * Lives inside <Canvas> (unlike the parent Viewer3D shell) specifically so
@@ -78,23 +79,9 @@
     loadedScene = scene;
   }
 
-  // Selections only record an explicit override once the user actually
-  // clicks something — categories the user hasn't touched yet should still
-  // show (and paint) their is_default choice, matching what ConfiguratorPanel
-  // already displays as "selected" before any interaction.
-  function resolveEffectiveSelections() {
-    const categories = vehicle?.option_categories ?? [];
-    const effective = {};
-    for (const category of categories) {
-      const choiceId = selections[category.id] ?? category.choices.find((c) => c.is_default)?.id;
-      if (choiceId != null) effective[category.id] = choiceId;
-    }
-    return effective;
-  }
-
   function applyMaterialSelections() {
     if (!loadedScene || !vehicle?.option_categories) return;
-    const effective = resolveEffectiveSelections();
+    const effective = effectiveSelections(vehicle, selections);
 
     for (const category of vehicle.option_categories) {
       const choice = category.choices.find((c) => c.id === effective[category.id]);

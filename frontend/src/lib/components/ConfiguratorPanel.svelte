@@ -1,11 +1,16 @@
 <script>
   import { createEventDispatcher } from "svelte";
+  import { api } from "../api.js";
+  import { effectiveSelections, getSessionKey } from "../selections.js";
 
   export let vehicle;
   /** @type {Record<number, number>} categoryId -> selected choiceId */
   export let selections = {};
 
   const dispatch = createEventDispatcher();
+
+  let saveState = "idle"; // "idle" | "saving" | "saved" | "error"
+  let priceFlash = false;
 
   function selectChoice(categoryId, choiceId) {
     selections = { ...selections, [categoryId]: choiceId };
@@ -17,9 +22,22 @@
     return category?.choices.find((c) => c.id === choiceId)?.price_delta ?? 0;
   }
 
+  // Price for every category, not just the ones the user has explicitly
+  // clicked — an untouched category is still showing (and charging for) its
+  // is_default choice, so that has to be counted too.
+  $: effective = effectiveSelections(vehicle, selections);
   $: totalPrice =
     Number(vehicle.base_price) +
-    Object.entries(selections).reduce((sum, [catId, choiceId]) => sum + Number(priceFor(Number(catId), choiceId)), 0);
+    Object.entries(effective).reduce((sum, [catId, choiceId]) => sum + Number(priceFor(Number(catId), choiceId)), 0);
+
+  // Brief pulse on the price readout whenever it changes, so a choice swap
+  // reads as an immediate, tangible effect rather than a silent number swap.
+  let previousPrice = totalPrice;
+  $: if (totalPrice !== previousPrice) {
+    previousPrice = totalPrice;
+    priceFlash = false;
+    requestAnimationFrame(() => (priceFlash = true));
+  }
 
   function formatPrice(value) {
     return new Intl.NumberFormat("en-US", {
@@ -27,6 +45,18 @@
       currency: "USD",
       maximumFractionDigits: 0,
     }).format(value);
+  }
+
+  async function saveConfiguration() {
+    saveState = "saving";
+    try {
+      await api.createConfiguration(vehicle.id, Object.values(effective), getSessionKey());
+      saveState = "saved";
+    } catch (err) {
+      console.warn("Couldn't save configuration — is the Django API running?", err);
+      saveState = "error";
+    }
+    setTimeout(() => (saveState = "idle"), 2400);
   }
 </script>
 
@@ -38,7 +68,7 @@
 
   <div class="price-block">
     <span class="mono-label">EST. PRICE</span>
-    <span class="price">{formatPrice(totalPrice)}</span>
+    <span class="price" class:flash={priceFlash}>{formatPrice(totalPrice)}</span>
   </div>
 
   {#each vehicle.option_categories as category}
@@ -72,7 +102,17 @@
     </section>
   {/each}
 
-  <button class="cta">Save configuration</button>
+  <button class="cta" class:success={saveState === "saved"} class:error={saveState === "error"} disabled={saveState === "saving"} on:click={saveConfiguration}>
+    {#if saveState === "saving"}
+      Saving…
+    {:else if saveState === "saved"}
+      Saved ✓
+    {:else if saveState === "error"}
+      Couldn't save — try again
+    {:else}
+      Save configuration
+    {/if}
+  </button>
 </aside>
 
 <style>
@@ -106,10 +146,24 @@
     border: 1px solid var(--line);
   }
   .price {
+    display: inline-block;
     font-family: var(--font-mono);
     font-size: 24px;
     font-weight: 500;
     color: var(--purple-300);
+  }
+  .price.flash {
+    animation: price-pulse 0.5s ease;
+  }
+  @keyframes price-pulse {
+    0% {
+      color: var(--text-primary);
+      transform: scale(1.06);
+    }
+    100% {
+      color: var(--purple-300);
+      transform: scale(1);
+    }
   }
 
   .category-title {
@@ -178,7 +232,17 @@
     font-weight: 500;
     letter-spacing: 0.02em;
   }
-  .cta:hover {
+  .cta:hover:not(:disabled) {
     filter: brightness(1.1);
+  }
+  .cta:disabled {
+    opacity: 0.7;
+    cursor: default;
+  }
+  .cta.success {
+    background: var(--success);
+  }
+  .cta.error {
+    background: var(--danger);
   }
 </style>

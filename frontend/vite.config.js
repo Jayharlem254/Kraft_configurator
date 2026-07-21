@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [svelte()],
   server: {
-    port: 3000,
+    port: 5173,
     proxy: {
       "/api": "http://localhost:8000",
       "/media": "http://localhost:8000",

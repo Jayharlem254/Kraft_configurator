@@ -77,6 +77,35 @@ body {
 
 #app {
   min-height: 100vh;
+  position: relative;
+  isolation: isolate;
+}
+
+/* Slow-drifting ambient glow behind the whole app — reads as "deep space
+   telemetry" rather than a flat void, without competing with content
+   (fixed, low-opacity, pointer-events: none, sits at z-index: -1 via isolate
+   above). Off entirely in light mode, where it'd just muddy white panels. */
+#app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(600px circle at 15% 20%, rgba(139, 92, 246, 0.1), transparent 60%),
+    radial-gradient(500px circle at 85% 75%, rgba(91, 33, 182, 0.12), transparent 60%);
+  animation: drift 26s ease-in-out infinite alternate;
+}
+:root[data-theme="light"] #app::before {
+  display: none;
+}
+@keyframes drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(2%, -3%) scale(1.08);
+  }
 }
 
 h1,

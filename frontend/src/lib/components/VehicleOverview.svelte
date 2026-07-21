@@ -9,10 +9,15 @@
   export let hasNext = false;
 
   let activeCategoryId = null;
+  let previousVehicleSlug = null;
 
-  // Default to the first option category whenever the vehicle changes.
-  $: if (vehicle?.option_categories?.length && activeCategoryId === null) {
-    activeCategoryId = vehicle.option_categories[0].id;
+  // Default to the first option category whenever the vehicle changes (not
+  // just the first time) — prev/next swaps `vehicle` without remounting this
+  // component, so without tracking the slug this only ever fired once and
+  // left activeCategoryId pointing at a category id from the previous vehicle.
+  $: if (vehicle?.slug !== previousVehicleSlug) {
+    previousVehicleSlug = vehicle?.slug ?? null;
+    activeCategoryId = vehicle?.option_categories?.[0]?.id ?? null;
   }
   $: activeCategory = vehicle?.option_categories?.find((c) => c.id === activeCategoryId);
   $: colorCategory = vehicle?.option_categories?.find((c) => c.choices?.some((ch) => ch.swatch_hex));
