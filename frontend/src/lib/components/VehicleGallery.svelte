@@ -2,6 +2,7 @@
   export let vehicles = [];
   export let loading = false;
   export let onSelect = () => {};
+  export let onUpload = () => {};
 
   function formatPrice(value) {
     const num = Number(value);
@@ -9,10 +10,6 @@
     return num.toLocaleString("en-US", { maximumFractionDigits: 0 });
   }
 
-  // Cursor-tracked spotlight on each card — position fed in as CSS vars and
-  // painted with a radial-gradient in the stylesheet, so this stays a plain
-  // style update rather than anything that re-triggers Svelte reactivity per
-  // mouse-move.
   function trackPointer(e) {
     const rect = e.currentTarget.getBoundingClientRect();
     e.currentTarget.style.setProperty("--mx", `${e.clientX - rect.left}px`);
@@ -22,14 +19,18 @@
 
 <div class="gallery">
   <div class="intro">
-    <h1>Build your own</h1>
-    <p class="mono-label subtitle">SELECT A MODEL TO ENTER THE CONFIGURATOR</p>
+    <div class="intro-badge row">
+      <span class="dot-led"></span>
+      <span class="mono-label">FLEET CATALOG // C++ HIGH PERFORMANCE ENGINE</span>
+    </div>
+    <h1>PRECISION VEHICLES</h1>
+    <p class="mono-label subtitle">SELECT A VEHICLE PLATFORM TO INITIALIZE REAL-TIME 3D CONFIGURATION</p>
   </div>
 
   {#if loading}
     <div class="grid" aria-hidden="true">
-      {#each { length: 8 } as _}
-        <div class="card skeleton">
+      {#each { length: 6 } as _}
+        <div class="card skeleton milled">
           <div class="thumb"></div>
           <div class="meta">
             <div class="row">
@@ -42,11 +43,24 @@
       {/each}
     </div>
   {:else if vehicles.length === 0}
-    <p class="mono-label state">NO VEHICLES PUBLISHED YET — CHECK THE DJANGO ADMIN</p>
+    <div class="empty-gallery milled">
+      <div class="empty-icon">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+          <line x1="12" y1="22.08" x2="12" y2="12" />
+        </svg>
+      </div>
+      <h3 class="mono empty-gallery-title">NO VEHICLES REGISTERED</h3>
+      <p class="mono-label empty-gallery-sub">PLACEHOLDERS REMOVED — READY FOR YOUR ACTUAL 3D MODELS</p>
+      <button class="btn-upload-first raised mono" on:click={onUpload}>
+        + UPLOAD 3D MODEL (.GLB / .GLTF)
+      </button>
+    </div>
   {:else}
     <div class="grid">
       {#each vehicles as v (v.slug)}
-        <button class="card" on:click={() => onSelect(v)} on:pointermove={trackPointer}>
+        <button class="card raised" on:click={() => onSelect(v)} on:pointermove={trackPointer}>
           <div class="glow" aria-hidden="true"></div>
           <div class="thumb">
             {#if v.thumbnail}
@@ -57,75 +71,131 @@
                 <span class="corner tr"></span>
                 <span class="corner bl"></span>
                 <span class="corner br"></span>
-                <span class="mono-label glyph">{v.vehicle_type}</span>
+                <span class="mono-label glyph">{v.vehicle_type?.toUpperCase() || 'PLATFORM'}</span>
               </div>
             {/if}
             <div class="scrim"></div>
-            <span class="mono-label cta">CONFIGURE →</span>
+            <div class="type-tag mono">{v.vehicle_type?.toUpperCase()}</div>
+            <span class="mono-label cta">CONFIGURE STUDIO →</span>
           </div>
           <div class="meta">
-            <div class="row">
-              <h3>{v.name}</h3>
-              <span class="mono-label price">${formatPrice(v.base_price)}</span>
+            <div class="title-row row">
+              <h3 class="name">{v.name}</h3>
+              <span class="price mono">${formatPrice(v.base_price)}</span>
             </div>
             {#if v.tagline}
               <p class="tagline">{v.tagline}</p>
             {/if}
+
+            <!-- Quick Specs Row -->
+            {#if v.specs}
+              <div class="specs-preview row">
+                {#if v.specs.power}
+                  <span class="spec-tag mono">{v.specs.power}</span>
+                {/if}
+                {#if v.specs.acceleration}
+                  <span class="spec-tag mono">{v.specs.acceleration}</span>
+                {/if}
+                {#if v.specs.top_speed}
+                  <span class="spec-tag mono">{v.specs.top_speed}</span>
+                {/if}
+              </div>
+            {/if}
           </div>
         </button>
       {/each}
+
+      <!-- Quick Upload Card -->
+      <button class="card raised upload-card" on:click={onUpload} on:pointermove={trackPointer}>
+        <div class="glow" aria-hidden="true"></div>
+        <div class="thumb upload-thumb">
+          <div class="upload-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </div>
+          <span class="mono-label upload-label">IMPORT 3D MODEL</span>
+          <span class="upload-sub dim mono">.GLB / .GLTF / .OBJ</span>
+        </div>
+        <div class="meta">
+          <div class="row spread">
+            <span class="name upload-name">+ ADD NEW VEHICLE</span>
+            <span class="tag-upload mono">C++ INGEST</span>
+          </div>
+          <p class="tagline">Stream high-poly 3D models directly to native backend storage</p>
+        </div>
+      </button>
     </div>
   {/if}
 </div>
 
 <style>
   .gallery {
-    max-width: 1240px;
+    max-width: 1260px;
     margin: 0 auto;
-    padding: 12px 4px 40px;
+    padding: 16px 12px 40px;
   }
 
   .intro {
-    padding: 28px 0 32px;
-  }
-  .intro h1 {
-    font-size: 34px;
-    margin-bottom: 8px;
-  }
-  .subtitle {
-    color: var(--text-tertiary);
+    padding: 20px 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
 
-  .state {
-    margin: 80px auto;
-    text-align: center;
-    display: block;
+  .intro-badge {
+    gap: 6px;
+    font-size: 10px;
+    color: var(--crystal-bright);
+  }
+
+  .dot-led {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--crystal-blue);
+    box-shadow: 0 0 6px var(--crystal-blue);
+  }
+
+  .intro h1 {
+    font-size: 28px;
+    letter-spacing: -0.02em;
+    color: var(--text-hi);
+  }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 10px;
   }
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 22px;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 20px;
   }
 
   .card {
     position: relative;
-    background: var(--panel);
-    border: 1px solid var(--line);
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
     border-radius: var(--radius-md);
     padding: 0;
     text-align: left;
-    color: var(--text-primary);
+    color: var(--text);
     overflow: hidden;
-    transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
-  }
-  .card:hover {
-    border-color: var(--purple-500);
-    transform: translateY(-3px);
-    box-shadow: 0 12px 30px -12px rgba(139, 92, 246, 0.45);
+    cursor: pointer;
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
   }
 
-  /* Cursor-tracked spotlight — --mx/--my set from pointermove in the script */
+  .card:hover {
+    border-color: var(--crystal-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px -10px var(--crystal-glow);
+  }
+
+  /* Cursor-tracked spotlight in Crystal Blue */
   .glow {
     position: absolute;
     inset: 0;
@@ -134,8 +204,8 @@
     opacity: 0;
     transition: opacity 0.25s;
     background: radial-gradient(
-      280px circle at var(--mx, 50%) var(--my, 50%),
-      rgba(139, 92, 246, 0.16),
+      320px circle at var(--mx, 50%) var(--my, 50%),
+      rgba(0, 210, 255, 0.14),
       transparent 70%
     );
   }
@@ -143,131 +213,263 @@
     opacity: 1;
   }
 
-  .skeleton {
-    cursor: default;
+  .thumb {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    background: radial-gradient(circle at 50% 30%, #151d28 0%, #070a0e 85%);
+    overflow: hidden;
+    border-bottom: 1px solid var(--line);
   }
+
+  .thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+  }
+  .card:hover .thumb img {
+    transform: scale(1.03);
+  }
+
+  .placeholder {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at 50% 40%, #172230 0%, #080c10 80%);
+  }
+
+  .corner {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--crystal-blue);
+    opacity: 0.6;
+  }
+  .corner.tl { top: 12px; left: 12px; border-right: none; border-bottom: none; }
+  .corner.tr { top: 12px; right: 12px; border-left: none; border-bottom: none; }
+  .corner.bl { bottom: 12px; left: 12px; border-right: none; border-top: none; }
+  .corner.br { bottom: 12px; right: 12px; border-left: none; border-top: none; }
+
+  .glyph {
+    color: var(--crystal-bright);
+    letter-spacing: 0.2em;
+    font-size: 11px;
+  }
+
+  .type-tag {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(12, 15, 19, 0.75);
+    backdrop-filter: blur(4px);
+    border: 1px solid var(--line-soft);
+    padding: 2px 6px;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    border-radius: var(--radius-sm);
+  }
+
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 40%, rgba(8, 11, 15, 0.8) 100%);
+  }
+
+  .cta {
+    position: absolute;
+    bottom: 10px;
+    right: 12px;
+    color: var(--crystal-bright);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: all 0.18s ease;
+  }
+  .card:hover .cta {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .meta {
+    padding: 12px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .title-row {
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .name {
+    font-size: 15px;
+    color: var(--text-hi);
+  }
+
+  .price {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--crystal-bright);
+  }
+
+  .tagline {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin: 0;
+    line-height: 1.35;
+  }
+
+  .specs-preview {
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .spec-tag {
+    font-size: 9px;
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    padding: 2px 5px;
+    border-radius: 2px;
+    color: var(--text-secondary);
+  }
+
+  /* Skeleton loading state */
   .skeleton .thumb {
-    background: linear-gradient(90deg, #100f17 0%, #1c1a29 50%, #100f17 100%);
+    background: linear-gradient(90deg, #0e131a 0%, #19222f 50%, #0e131a 100%);
     background-size: 200% 100%;
     animation: shimmer 1.6s ease-in-out infinite;
   }
   .skel-line {
     display: block;
     height: 12px;
-    border-radius: 4px;
-    background: linear-gradient(90deg, #14121d 0%, #221f30 50%, #14121d 100%);
+    border-radius: 3px;
+    background: linear-gradient(90deg, #10161f 0%, #1e2837 50%, #10161f 100%);
     background-size: 200% 100%;
     animation: shimmer 1.6s ease-in-out infinite;
   }
-  .skel-line.title {
-    width: 55%;
-    height: 15px;
-  }
-  .skel-line.price {
-    width: 20%;
-  }
-  .skel-line.tagline {
-    width: 80%;
-    margin-top: 10px;
-  }
+  .skel-line.title { width: 50%; height: 14px; }
+  .skel-line.price { width: 25%; }
+  .skel-line.tagline { width: 80%; margin-top: 8px; }
+
   @keyframes shimmer {
-    0% {
-      background-position: 200% 0;
-    }
-    100% {
-      background-position: -200% 0;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .skeleton .thumb,
-    .skel-line {
-      animation: none;
-    }
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 
-  .thumb {
-    position: relative;
-    aspect-ratio: 4 / 3;
-    background: radial-gradient(circle at 50% 30%, #14121d 0%, #06060a 75%);
-    overflow: hidden;
-  }
-  .thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
+  .upload-card {
+    border: 1px dashed var(--line-bright);
+    background: rgba(19, 23, 31, 0.6);
   }
 
-  .placeholder {
-    position: absolute;
-    inset: 14px;
+  .upload-card:hover {
+    border-color: var(--crystal-blue);
+    border-style: solid;
+    box-shadow: 0 0 16px rgba(0, 210, 255, 0.15);
   }
-  .corner {
-    position: absolute;
-    width: 18px;
-    height: 18px;
-    border: 1.5px solid var(--purple-300);
-    opacity: 0.55;
-  }
-  .corner.tl { top: 0; left: 0; border-right: none; border-bottom: none; }
-  .corner.tr { top: 0; right: 0; border-left: none; border-bottom: none; }
-  .corner.bl { bottom: 0; left: 0; border-right: none; border-top: none; }
-  .corner.br { bottom: 0; right: 0; border-left: none; border-top: none; }
-  .glyph {
-    position: absolute;
-    inset: 0;
+
+  .upload-thumb {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    letter-spacing: 0.2em;
-    color: var(--text-tertiary);
+    background: var(--field);
+    gap: 8px;
   }
 
-  .scrim {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, transparent 55%, rgba(6, 6, 10, 0.85) 100%);
-    opacity: 0;
-    transition: opacity 0.18s;
-  }
-  .card:hover .scrim {
-    opacity: 1;
+  .upload-icon {
+    color: var(--crystal-bright);
+    opacity: 0.85;
+    transition: transform 0.2s ease;
   }
 
-  .cta {
-    position: absolute;
-    bottom: 14px;
-    left: 16px;
-    color: var(--purple-300);
-    opacity: 0;
-    transform: translateY(4px);
-    transition: opacity 0.18s, transform 0.18s;
-  }
-  .card:hover .cta {
-    opacity: 1;
-    transform: translateY(0);
+  .upload-card:hover .upload-icon {
+    transform: translateY(-2px) scale(1.05);
+    color: var(--crystal-blue);
   }
 
-  .meta {
-    padding: 16px 18px 18px;
+  .upload-label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--text-hi);
   }
-  .row {
+
+  .upload-sub {
+    font-size: 9px;
+  }
+
+  .upload-name {
+    color: var(--crystal-bright);
+  }
+
+  .tag-upload {
+    font-size: 9px;
+    background: rgba(0, 210, 255, 0.15);
+    border: 1px solid var(--crystal-blue);
+    color: var(--crystal-bright);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .empty-gallery {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 48px 24px;
+    margin: 40px auto;
+    max-width: 540px;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    border: 1px solid var(--line);
   }
-  .row h3 {
-    font-size: 17px;
+
+  .empty-icon {
+    color: var(--crystal-blue);
+    opacity: 0.8;
+    margin-bottom: 16px;
   }
-  .price {
-    color: var(--metal-silver);
-    white-space: nowrap;
+
+  .empty-gallery-title {
+    font-size: 15px;
+    letter-spacing: 0.12em;
+    color: var(--text-hi);
+    margin: 0 0 8px;
   }
-  .tagline {
-    margin: 8px 0 0;
-    font-size: 13px;
-    color: var(--text-secondary);
-    line-height: 1.4;
+
+  .empty-gallery-sub {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 0 0 24px;
+  }
+
+  .btn-upload-first {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: linear-gradient(135deg, #00d2ff, #0099cc);
+    border: 1px solid var(--crystal-bright);
+    color: #05070a;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    border-radius: var(--radius);
+    cursor: pointer;
+    box-shadow: 0 0 16px var(--crystal-glow);
+    transition: all 0.15s ease;
+  }
+
+  .btn-upload-first:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 24px var(--crystal-glow);
+    background: linear-gradient(135deg, #70e1ff, #00d2ff);
   }
 </style>

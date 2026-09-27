@@ -1,63 +1,96 @@
 /*
-  Kraft Configurator — theme tokens
-  Direction: deep-space dark UI, brushed violet-metal accents, launch-telemetry
-  overlay details (corner brackets, scan lines, mono readouts). Reference points:
-  Porsche configurator (layout/interaction model) crossed with SpaceX webcast HUD
-  (typography, overlay chrome).
+  Kraft Configurator — Quni4m Tactile Hardware System & Crystal Blue Identity
+  Modeled after Quni4m / HQC:
+  - Dark anodized machined aluminum chassis with -45 deg light-physics layer
+  - Extruded tactile controls (.raised), milled debossed slots (.milled)
+  - Crystal Blue LED and bloom accents (#00d2ff, #70e1ff, #0088cc)
+  - Precision Cascadia/JetBrains monospace telemetry and segment readouts
 */
 
 :root {
-  /* --- color --- */
-  --void: #06060a;            /* page background, deep space */
-  --panel: #111018;           /* raised surface (cards, side panel) */
-  --panel-raised: #181722;    /* hover/active surface */
-  --line: rgba(167, 139, 250, 0.16); /* hairline dividers / grid */
-  --line-strong: rgba(167, 139, 250, 0.32);
+  /* --- Quni4m Machined Dark Chassis --- */
+  --bg: #0c0f13;
+  --panel: #13171f;
+  --panel-2: #18202a;
+  --surface: #1e2634;
+  --surface-hi: #273344;
+  --field: #080b0f;
+  --canvas: #050709;
+  --line: #030508;
+  --line-soft: #222d3b;
+  --void: #0a0d11;
 
-  --purple-300: #c4b5fd;      /* highlight / glow */
-  --purple-500: #8b5cf6;      /* primary accent */
-  --purple-700: #5b21b6;      /* pressed / deep accent */
-  --purple-900: #2e1065;      /* metallic shadow, gradient base */
-  --metal-silver: #9a9aa6;    /* cool brushed-metal counterpoint to purple */
+  --text: #cfd8e3;
+  --text-hi: #f0f4f9;
+  --text-dim: #6d7c8e;
+  --text-primary: #f0f4f9;
+  --text-secondary: #8c9cb0;
+  --text-tertiary: #58687a;
 
-  --text-primary: #f4f3f8;
-  --text-secondary: #8d8b9b;
-  --text-tertiary: #5d5b6b;
+  /* --- Crystal Blue Spectrum (Replacing Purple) --- */
+  --crystal-blue: #00d2ff;          /* Primary vibrant crystal cyan/blue */
+  --crystal-bright: #70e1ff;        /* Specular highlight & active edge */
+  --crystal-deep: #0077b6;          /* Deep crystal metallic shadow */
+  --crystal-dark: #003459;          /* Deep base shadow */
+  --crystal-ice: #e0f7fa;           /* Pure ice white-cyan highlight */
+  --crystal-dim: rgba(0, 210, 255, 0.14);
+  --crystal-glow: rgba(0, 210, 255, 0.35);
+  --crystal-glow-strong: rgba(0, 210, 255, 0.7);
 
-  --success: #34d399;
-  --danger: #f87171;
+  /* Primary Accent Aliases */
+  --accent: var(--crystal-blue);
+  --accent-2: var(--crystal-bright);
+  --accent-dim: var(--crystal-dim);
+  --accent-glow: var(--crystal-glow);
 
-  /* brushed-metal gradient used sparingly on primary surfaces/buttons */
-  --gradient-metal: linear-gradient(135deg, #2e1065 0%, #5b21b6 45%, #8b5cf6 70%, #4c1d95 100%);
+  /* Backward Compatibility: remap purple tokens to crystal blue ramp */
+  --purple-300: var(--crystal-bright);
+  --purple-500: var(--crystal-blue);
+  --purple-700: var(--crystal-deep);
+  --purple-900: #041b2d;
+  --metal-silver: #9ab3c6;
 
-  /* --- type --- */
-  --font-display: "Space Grotesk", sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  /* --- LED Indicators --- */
+  --led-crystal: #00d2ff;
+  --led-emerald: #46d18a;
+  --led-amber:   #ffaa00;
+  --led-red:     #ff5468;
+  --success:     #46d18a;
+  --danger:      #ff5468;
 
-  /* --- layout --- */
+  /* Brushed crystal metal gradient */
+  --gradient-metal: linear-gradient(135deg, #021a2c 0%, #004d73 45%, #00d2ff 75%, #0077b6 100%);
+  --gradient-crystal: linear-gradient(180deg, rgba(0, 210, 255, 0.18) 0%, rgba(0, 119, 182, 0.05) 100%);
+
+  /* --- Tactile Light-Physics Layer (from Quni4m) --- */
+  --face-hi:  #243042;              /* Top edge catches light */
+  --face:     #1a2330;              /* Mid raised face */
+  --face-lo:  #10151e;              /* Debossed recess floor */
+  --rim-hi:   rgba(255, 255, 255, 0.09); /* 1px top-left catch */
+  --rim-lo:   rgba(0, 0, 0, 0.7);   /* 1px bottom-right shadow */
+
+  /* Extruded raised face */
+  --extrude: inset 1px 1px 0 var(--rim-hi), inset -1px -1px 1px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.6);
+  /* Debossed recessed slot */
+  --deboss: inset 1px 1px 3px rgba(0, 0, 0, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.04);
+
+  /* Tactile physics motion */
+  --snap-in: 70ms ease-out;
+  --snap-out: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --press-shift: translate(0.6px, 0.6px);
+
+  /* --- Typography --- */
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "JetBrains Mono", "Consolas", monospace;
+  --font: 11px/1.35 "Segoe UI", system-ui, sans-serif;
+  --mono: var(--font-mono);
+
+  /* --- Layout & Radii --- */
   --radius-sm: 4px;
-  --radius-md: 10px;
-  --radius-lg: 18px;
-}
-:root[data-theme="light"] {
-  --void: #f4f3f8;
-  --panel: #ffffff;
-  --panel-raised: #ece9f5;
-  --line: rgba(91, 33, 182, 0.14);
-  --line-strong: rgba(91, 33, 182, 0.3);
-
-  --purple-300: #7c3aed;
-  --purple-500: #6d28d9;
-  --purple-700: #5b21b6;
-  --purple-900: #ede9fe;
-  --metal-silver: #6b6b76;
-
-  --text-primary: #17151f;
-  --text-secondary: #4a4757;
-  --text-tertiary: #7d7a8a;
-
-  --gradient-metal: linear-gradient(135deg, #ddd6fe 0%, #a78bfa 45%, #7c3aed 70%, #4c1d95 100%);
+  --radius: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
 }
 
 * {
@@ -65,26 +98,156 @@
 }
 
 html,
-body {
+body,
+#app {
+  height: 100%;
   margin: 0;
   padding: 0;
-  background: var(--void);
-  color: var(--text-primary);
+  background: var(--bg);
+  color: var(--text);
+  font: var(--font);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+button {
   font-family: var(--font-body);
-  -webkit-font-smoothing: antialiased;
-  transition: background-color 0.25s ease, color 0.25s ease;
+  border-radius: var(--radius);
+  cursor: pointer;
 }
 
-#app {
-  min-height: 100vh;
-  position: relative;
-  isolation: isolate;
+input {
+  font-family: var(--font-mono);
+  border-radius: var(--radius);
 }
 
-/* Slow-drifting ambient glow behind the whole app — reads as "deep space
-   telemetry" rather than a flat void, without competing with content
-   (fixed, low-opacity, pointer-events: none, sits at z-index: -1 via isolate
-   above). Off entirely in light mode, where it'd just muddy white panels. */
+/* Thin Quni4m-style scrollbars */
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #283444;
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--crystal-deep);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* --- Tactile Physical Classes --- */
+.raised {
+  background: linear-gradient(180deg, var(--face-hi), var(--face));
+  box-shadow: var(--extrude);
+  border: none;
+}
+.raised:active {
+  transform: var(--press-shift);
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.65), 0 0 0 rgba(0, 0, 0, 0);
+  transition: transform var(--snap-in), box-shadow var(--snap-in);
+}
+
+.milled {
+  background: var(--face-lo);
+  box-shadow: var(--deboss);
+  border: none;
+}
+
+/* Layout helpers */
+.row {
+  display: flex;
+  align-items: center;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+}
+.dim {
+  color: var(--text-dim);
+}
+.mono {
+  font-family: var(--font-mono);
+}
+.sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  margin: 0 6px;
+}
+.grow {
+  flex: 1 1 auto;
+}
+
+/* Flat tactile control surface chips (Quni4m) */
+.chip {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  color: var(--text);
+  padding: 3px 8px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  border-radius: var(--radius);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.chip:hover {
+  border-color: var(--crystal-blue);
+  color: var(--text-hi);
+}
+.chip.on {
+  background: var(--crystal-blue);
+  color: #051019;
+  border-color: var(--crystal-bright);
+  box-shadow: 0 0 8px var(--crystal-glow);
+  font-weight: 600;
+}
+
+/* Tactile tool buttons (Quni4m .tb) */
+.tb {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  color: var(--text);
+  min-width: 24px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0 6px;
+  font-size: 11px;
+  border-radius: var(--radius);
+  transition: all 0.15s ease;
+}
+.tb:hover {
+  border-color: var(--crystal-blue);
+  color: var(--crystal-bright);
+}
+.tb.on {
+  color: var(--crystal-blue);
+  border-color: var(--crystal-blue);
+  background: rgba(0, 210, 255, 0.1);
+  box-shadow: 0 0 9px var(--crystal-glow);
+  text-shadow: 0 0 8px var(--crystal-glow);
+}
+
+/* Ambient Crystal Blue Glow */
 #app::before {
   content: "";
   position: fixed;
@@ -92,48 +255,43 @@ body {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(600px circle at 15% 20%, rgba(139, 92, 246, 0.1), transparent 60%),
-    radial-gradient(500px circle at 85% 75%, rgba(91, 33, 182, 0.12), transparent 60%);
+    radial-gradient(700px circle at 15% 15%, rgba(0, 210, 255, 0.08), transparent 60%),
+    radial-gradient(600px circle at 85% 85%, rgba(0, 119, 182, 0.09), transparent 60%);
   animation: drift 26s ease-in-out infinite alternate;
 }
-:root[data-theme="light"] #app::before {
-  display: none;
-}
+
 @keyframes drift {
   0% {
     transform: translate(0, 0) scale(1);
   }
   100% {
-    transform: translate(2%, -3%) scale(1.08);
+    transform: translate(2%, -2%) scale(1.06);
   }
 }
 
 h1,
 h2,
-h3 {
+h3,
+h4 {
   font-family: var(--font-display);
   font-weight: 700;
   margin: 0;
   letter-spacing: -0.01em;
+  color: var(--text-hi);
 }
 
 .mono-label {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
 
-/* Visible keyboard focus everywhere — don't rely on browser default inside dark UI */
+/* Visible keyboard focus everywhere in Crystal Blue */
 :focus-visible {
-  outline: 2px solid var(--purple-300);
+  outline: 2px solid var(--crystal-blue);
   outline-offset: 2px;
-}
-
-button {
-  font-family: var(--font-body);
-  cursor: pointer;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -142,5 +300,3 @@ button {
     transition-duration: 0.001ms !important;
   }
 }
-
-

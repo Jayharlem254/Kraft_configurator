@@ -1,7 +1,8 @@
 <script>
-  import { WebGLRenderer } from "three";
+  import { WebGLRenderer, ACESFilmicToneMapping, NoToneMapping, SRGBColorSpace } from "three";
   import { Canvas } from "@threlte/core";
   import Viewer3DScene from "./Viewer3DScene.svelte";
+  import ModelInspector from "./ModelInspector.svelte";
 
   /**
    * `glbUrl` should point at the optimized model produced by the asset
@@ -9,12 +10,19 @@
    * FileField on Vehicle.model_file). See Viewer3DScene for loading/framing
    * details. This component is the "shell": Canvas + HUD chrome + the tool
    * panel (select / measure / paint marker / screenshot / environment).
+   *
+   * `inspector` turns on the dev/QA "Model Inspector" sidebar (scene stats,
+   * scene graph, wireframe/material-channel debugging, camera presets).
+   * It's off by default — it's a build-verification tool, not something a
+   * customer configuring a car should see. App.svelte flips it on via a
+   * `?inspector=1` query param.
    */
   export let glbUrl = null;
-  export let accentColor = "#8b5cf6";
+  export let accentColor = "#00d2ff";
   export let modelScale = 1;
   export let vehicle = null;
   export let selections = {};
+  export let inspector = false;
 
   const TOOLS = [
     { id: "select", label: "Select", hint: "DRAG TO ORBIT" },
@@ -22,7 +30,7 @@
     { id: "decal", label: "Paint marker", hint: "CLICK THE MODEL TO DROP A MARKER" },
   ];
   const ENVIRONMENTS = ["studio", "sunset", "overcast", "night"];
-  const DECAL_COLORS = ["#8b5cf6", "#f97316", "#22c55e", "#e11d48", "#f8fafc"];
+  const DECAL_COLORS = ["#00d2ff", "#70e1ff", "#22c55e", "#ff5468", "#f8fafc"];
 
   let activeTool = "select";
   let environment = "studio";
@@ -32,6 +40,16 @@
   let measurementDistance = null;
   let loading = false;
   let canvasEl;
+
+  // --- Model Inspector state (only read when `inspector` is true) ---
+  let wireframe = false;
+  let wireframeColor = "#ffffff";
+  let singleSided = false;
+  let renderMode = "final"; // "final" | "raw" — final = tone-mapped + env lighting
+  let materialChannel = "combined"; // "combined" | "base" | "normal" | "roughness" | "metalness" | "emission"
+  let matcap = false;
+  let sceneStats = null; // { tris, verts, meshes, mats, tex, graph }
+  let cameraApi = null; // { goTo(preset), reset() } — bound up from Viewer3DScene
 
   $: activeHint = TOOLS.find((t) => t.id === activeTool)?.hint ?? "DRAG TO ORBIT";
 
@@ -66,9 +84,31 @@
 
   // preserveDrawingBuffer is required for canvas.toDataURL() to reliably
   // capture the current frame instead of a blank/black one.
+  //
+  // toneMapping + outputColorSpace are what actually turn a "correct but
+  // flat" render into the punchy, glossy look of a proper preview render —
+  // without them three.js renders in linear space and clips highlights
+  // instead of rolling them off. shadowMap.enabled is required for the
+  // castShadow/receiveShadow flags set in Viewer3DScene to do anything.
+  let rendererRef = null;
+
   function createRenderer(canvas) {
     canvasEl = canvas;
-    return new WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+    const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.toneMapping = ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.outputColorSpace = SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    rendererRef = renderer;
+    return renderer;
+  }
+
+  // "No Post-Processing" (renderMode === "raw") drops tone mapping so you can
+  // sanity-check raw material/texture values without the ACES roll-off —
+  // useful for spotting a blown-out or mis-authored texture that the tone
+  // mapper would otherwise quietly mask.
+  $: if (rendererRef) {
+    rendererRef.toneMapping = renderMode === "final" ? ACESFilmicToneMapping : NoToneMapping;
   }
 
   function takeScreenshot() {
@@ -93,8 +133,16 @@
       {measurementDistance}
       {vehicle}
       {selections}
+      {wireframe}
+      {wireframeColor}
+      {singleSided}
+      {materialChannel}
+      {matcap}
+      useEnvironmentMap={renderMode === "final"}
       onModelClick={handleModelClick}
       onLoadingChange={(v) => (loading = v)}
+      onSceneStats={(s) => (sceneStats = s)}
+      bindCameraApi={(api) => (cameraApi = api)}
     />
   </Canvas>
 
@@ -110,7 +158,7 @@
   <div class="hud-label bottom-right mono-label">{activeHint}</div>
 
   <!-- Tool panel, Illustrator-style vertical strip -->
-  <div class="toolbar">
+  <div class="toolbar" class:shifted={inspector}>
     {#each TOOLS as tool (tool.id)}
       <button
         class="tool-btn"
@@ -209,6 +257,27 @@
       {/if}
     </div>
   {/if}
+
+  {#if inspector}
+    <ModelInspector
+      bind:wireframe
+      bind:wireframeColor
+      bind:singleSided
+      bind:renderMode
+      bind:materialChannel
+      bind:matcap
+      stats={sceneStats}
+      onCameraPreset={(preset) => cameraApi?.goTo(preset)}
+      onResetView={() => cameraApi?.reset()}
+    />
+  {/if}
+
+  {#if !glbUrl}
+    <div class="empty-model-overlay">
+      <div class="empty-badge mono">NO 3D MODEL ATTACHED</div>
+      <p class="empty-sub mono dim">Select or upload a .glb model in the "UPLOAD 3D" studio</p>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -216,9 +285,37 @@
     position: relative;
     width: 100%;
     height: 100%;
-    background: radial-gradient(circle at 50% 30%, #14121d 0%, #06060a 70%);
+    background: radial-gradient(circle at 50% 35%, #0f1622 0%, #05070a 75%);
     border-radius: var(--radius-lg);
     overflow: hidden;
+  }
+
+  .empty-model-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    background: rgba(10, 14, 20, 0.85);
+    border: 1px solid var(--line);
+    padding: 20px 32px;
+    border-radius: var(--radius);
+    backdrop-filter: blur(8px);
+    z-index: 5;
+  }
+
+  .empty-badge {
+    color: var(--crystal-bright);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .empty-sub {
+    font-size: 11px;
+    margin: 0;
   }
 
   .hud-frame {
@@ -231,8 +328,9 @@
     position: absolute;
     width: 22px;
     height: 22px;
-    border: 1.5px solid var(--purple-300);
-    opacity: 0.65;
+    border: 1.5px solid var(--crystal-blue);
+    opacity: 0.75;
+    box-shadow: 0 0 6px var(--crystal-glow);
   }
   .corner.tl {
     top: 0;
@@ -265,14 +363,14 @@
     right: 0;
     top: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, var(--purple-300), transparent);
+    background: linear-gradient(90deg, transparent, var(--crystal-bright), transparent);
     opacity: 0.15;
     animation: sweep 1.4s linear infinite;
     animation-play-state: paused;
     transition: opacity 0.2s;
   }
   .scanline.active {
-    opacity: 0.5;
+    opacity: 0.55;
     animation-play-state: running;
   }
 
@@ -308,11 +406,16 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    background: rgba(15, 14, 22, 0.75);
-    border: 1px solid var(--line-strong);
+    background: rgba(14, 19, 26, 0.85);
+    border: 1px solid var(--line-soft);
     border-radius: var(--radius-md);
     padding: 8px;
     backdrop-filter: blur(8px);
+    transition: left 0.15s;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+  .toolbar.shifted {
+    left: 262px;
   }
 
   .tool-btn {
@@ -329,17 +432,18 @@
   }
   .tool-btn:hover {
     color: var(--text-primary);
-    background: var(--panel-raised);
+    background: var(--surface);
   }
   .tool-btn.active {
-    color: var(--purple-300);
-    border-color: var(--purple-500);
-    background: var(--panel);
+    color: var(--crystal-bright);
+    border-color: var(--crystal-blue);
+    background: rgba(0, 210, 255, 0.12);
+    box-shadow: 0 0 10px var(--crystal-glow);
   }
 
   .tool-divider {
     height: 1px;
-    background: var(--line);
+    background: var(--line-soft);
     margin: 2px 4px;
   }
 
