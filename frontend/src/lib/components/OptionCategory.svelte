@@ -3,7 +3,23 @@
   import Icon from "./Icon.svelte";
   import WheelGlyph from "./WheelGlyph.svelte";
 
-  let { category, cfg, filter = "" } = $props();
+  let { category, cfg, filter = "", previewRoles = null } = $props();
+
+  // On an uploaded model, options restyle only the parts the analyser found.
+  // Say so when none of this category's parts exist on the model.
+  const notPreviewed = $derived.by(() => {
+    if (!previewRoles) return false;
+    const roles = new Set();
+    let structural = false;
+    for (const c of category.choices) {
+      for (const v of c.visual ?? []) {
+        if (v.role) roles.add(v.role);
+        if (v.part) structural = true;
+      }
+    }
+    if (!roles.size) return structural;
+    return ![...roles].some((r) => previewRoles.has(r));
+  });
 
   const FINISH_GROUPS = [
     ["Solid", ["solid", "gloss", ""]],
@@ -75,6 +91,7 @@
     <header>
       <h3 id={`cat-${category.id}`} class="title">{category.name}</h3>
       {#if category.description}<p class="small muted">{category.description}</p>{/if}
+      {#if notPreviewed}<p class="xsmall subtle no-preview">Not shown on this 3D model, but still part of your build and price.</p>{/if}
     </header>
 
     {#if category.display === "swatch"}
@@ -169,6 +186,10 @@
   }
   .category:last-child {
     border-bottom: 0;
+  }
+  .no-preview {
+    margin-top: 4px;
+    font-style: italic;
   }
   header {
     margin-bottom: 14px;

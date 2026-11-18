@@ -174,6 +174,22 @@ export class MaterialLibrary {
   }
 
   applyTo(m, spec) {
+    // "Original finish": imported materials go back to exactly what the artist
+    // made (textures included); procedural ones use the detected colour/finish.
+    const orig = m.userData?.original;
+    if (spec.original && orig) {
+      if (orig.color) m.color.copy(orig.color);
+      if (m.map !== orig.map) {
+        m.map = orig.map;
+        m.needsUpdate = true;
+      }
+      for (const k of ["metalness", "roughness", "clearcoat", "clearcoatRoughness", "iridescence", "sheen"]) if (k in m && orig[k] !== undefined) m[k] = orig[k];
+      return;
+    }
+    if (orig && m.userData.dropMapOnRestyle && m.map) {
+      m.map = null;
+      m.needsUpdate = true;
+    }
     if (spec.color && m.color) m.color.set(spec.color);
     if (m.name === "role:glass" || spec.opacity !== undefined) {
       if (spec.opacity !== undefined) {
@@ -202,7 +218,7 @@ export class MaterialLibrary {
       }
     }
     // Only touch maps on materials we created; imported ones keep their textures.
-    if (m.name?.startsWith("role:")) {
+    if (m.name?.startsWith("role:") || (m.userData?.dropMapOnRestyle && (f.texture === "carbon" || m.map === carbonTexture))) {
       const wantCarbon = f.texture === "carbon";
       const hasCarbon = m.map === carbonTexture && !!carbonTexture;
       if (wantCarbon !== hasCarbon) {

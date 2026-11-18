@@ -3,6 +3,7 @@
   import { classLabel, CLASSES_BY_TYPE, money, TYPE_SINGULAR } from "../format.js";
   import { href } from "../router.svelte.js";
   import Icon from "../components/Icon.svelte";
+  import { analyzeVehicle } from "../modelAnalysis.js";
 
   let models = $state([]);
   let vehicles = $state([]);
@@ -15,6 +16,44 @@
   let uploading = $state(false);
   let result = $state(null);
   let error = $state(null);
+
+  // Model analysis report: { name, slug, summary } | { name, error }
+  let report = $state(null);
+  let analyzing = $state(null); // vehicle id being analysed
+  let analyzeProgress = $state(0);
+
+  const ROLE_LABELS = {
+    paint: "Body paint",
+    hull: "Hull",
+    rims: "Rims",
+    tyre: "Tyres",
+    calipers: "Brake calipers",
+    disc: "Brake discs",
+    glass: "Glass",
+    interior: "Interior",
+    seat: "Seat",
+    frame: "Frame",
+    deck: "Deck",
+    exhaust: "Exhaust",
+    lamp: "Lights",
+    taillight: "Tail lights",
+  };
+
+  async function analyze(v) {
+    if (!v?.model_file) return;
+    analyzing = v.id;
+    analyzeProgress = 0;
+    try {
+      // List rows omit material_map; analyse with the full definition.
+      const full = v.material_map ? v : await api.getVehicle(v.slug);
+      const { summary } = await analyzeVehicle(full, (p) => (analyzeProgress = p));
+      report = { name: v.name, slug: v.slug, summary };
+      await refresh();
+    } catch (e) {
+      report = { name: v.name, error: e.message || String(e) };
+    }
+    analyzing = null;
+  }
 
   async function refresh() {
     try {
@@ -62,6 +101,9 @@
       file = null;
       progress = 0;
       await refresh();
+      // Analyse straight away so the configurator opens arranged, with highlights
+      // and the model's original finish as an option.
+      if (result?.vehicle?.model_file) analyze(result.vehicle);
     } catch (err) {
       error = err.message;
     }
@@ -97,7 +139,8 @@
   <h1 class="display">Bring your own 3D models.</h1>
   <p class="muted lead">
     Upload a .glb (recommended, Draco/Meshopt compression supported), .gltf, .obj or .fbx. The engine registers it as a vehicle with
-    the full option set for its type. Paint, wheels, calipers and interior materials are bound automatically by material name.
+    the full option set for its type, then analyses the model: it removes ground planes, turns it the right way round, finds the
+    wheels, glass, lights, cabin and paint from the geometry, and picks out its best features as camera highlights.
   </p>
 
   {#if health}
@@ -189,6 +232,48 @@
         </div>
       {/if}
       <button class="btn btn-primary" type="submit" disabled={!file || uploading}>{uploading ? "Uploading…" : "Upload & register"}</button>
+
+      {#if analyzing}
+        <div class="progress"><span style={`transform:scaleX(${Math.max(analyzeProgress, 0.05)})`}></span></div>
+        <p class="small muted">Analysing the 3D model… finding wheels, glass, lights, cabin and paint.</p>
+      {/if}
+      {#if report}
+        <section class="report" aria-label="Model analysis">
+          {#if report.error}
+            <p><strong>{report.name}</strong>: the model couldn't be analysed.</p>
+            <p class="small error">{report.error}</p>
+          {:else}
+            {@const a = report.summary}
+            <p class="eyebrow">Model analysis</p>
+            <h3 class="h3">{report.name}</h3>
+            <dl class="facts">
+              <div><dt class="xsmall muted">Size</dt><dd class="num">{a.dims.length} × {a.dims.width} × {a.dims.height} m</dd></div>
+              <div><dt class="xsmall muted">Wheels</dt><dd class="num">{a.wheels.length || "—"}{a.wheel_inches ? ` · ≈${a.wheel_inches}″` : ""}</dd></div>
+              <div><dt class="xsmall muted">Geometry</dt><dd class="num">{a.stats.meshes} meshes · {Math.round(a.stats.triangles / 1000)}k tris</dd></div>
+              <div><dt class="xsmall muted">Hero angle</dt><dd>{a.hero === "rear34" ? "Rear ¾" : "Front ¾"}</dd></div>
+            </dl>
+            {#if a.notes.length}
+              <p class="small"><strong>Arranged</strong></p>
+              <ul class="notes small">{#each a.notes as n}<li>{n}</li>{/each}</ul>
+            {/if}
+            <p class="small"><strong>Parts the configurator can restyle</strong></p>
+            <ul class="parts">
+              {#each Object.entries(a.roles) as [role, names]}
+                <li class="small"><span>{ROLE_LABELS[role] ?? role}</span><span class="xsmall muted">{names.slice(0, 3).join(", ")}{names.length > 3 ? ` +${names.length - 3}` : ""}</span></li>
+              {/each}
+            </ul>
+            {#if a.original_paint}
+              <p class="small orig">
+                <span class="dot" style={`background:${a.original_paint.color}`}></span>
+                Original finish added as a paint option ({a.original_paint.finish}{a.original_paint.textured ? ", textured" : ""}).
+              </p>
+            {/if}
+            <p class="small"><strong>Highlights</strong></p>
+            <ul class="notes small">{#each a.highlights as h}<li>{h.label} <span class="muted">· {h.detail}</span></li>{/each}</ul>
+            {#if report.slug}<a class="btn btn-primary btn-sm" href={href(`/configure/${report.slug}`)}>Open in configurator</a>{/if}
+          {/if}
+        </section>
+      {/if}
     </form>
 
     <div class="lists">
@@ -203,6 +288,9 @@
                 <p class="xsmall muted">{TYPE_SINGULAR[v.vehicle_type]} · {classLabel(v.body_class)} · from {money(v.from_price)} · {v.option_count} options</p>
               </div>
               <a class="btn btn-ghost btn-sm" href={href(`/configure/${v.slug}`)}>Open</a>
+              {#if v.model_file}
+                <button class="btn btn-ghost btn-sm" disabled={analyzing !== null} onclick={() => analyze(v)}>{analyzing === v.id ? "Analysing…" : "Analyse"}</button>
+              {/if}
               <button class="btn btn-ghost btn-sm" onclick={() => togglePublish(v)}>{v.is_published ? "Hide" : "Publish"}</button>
               <button class="icon-btn" aria-label={`Delete ${v.name}`} onclick={() => removeVehicle(v)}><Icon name="trash" size={18} /></button>
             </li>
@@ -322,6 +410,63 @@
     flex-direction: column;
     gap: 10px;
     align-items: flex-start;
+  }
+  .report {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .report .h3 {
+    margin: 0;
+  }
+  .facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 16px;
+    margin: 4px 0;
+  }
+  .facts div {
+    display: flex;
+    flex-direction: column;
+  }
+  .facts dd {
+    margin: 0;
+    font-weight: 600;
+  }
+  .notes {
+    margin: 0;
+    padding-left: 18px;
+  }
+  .parts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .parts li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .parts li span:last-child {
+    text-align: right;
+    word-break: break-word;
+  }
+  .orig {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    flex-shrink: 0;
   }
   .lists {
     display: flex;

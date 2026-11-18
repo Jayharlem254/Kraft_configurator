@@ -297,6 +297,7 @@ bool Database::migrate() {
     ensure_column("vehicles", "material_map", "TEXT DEFAULT '{}'");
     ensure_column("vehicles", "source", "TEXT DEFAULT 'upload'");
     ensure_column("vehicles", "display_order", "INTEGER DEFAULT 0");
+    ensure_column("vehicles", "analysis", "TEXT DEFAULT '{}'");
 
     ensure_column("option_categories", "section", "TEXT DEFAULT 'exterior'");
     ensure_column("option_categories", "display", "TEXT DEFAULT 'list'");
@@ -360,7 +361,7 @@ void Database::set_meta(const std::string& key, const std::string& value) {
 
 static const char* VEHICLE_COLS =
     "id, name, slug, vehicle_type, tagline, description, base_price, model_file, thumbnail, is_published, "
-    "created_at, updated_at, body_class, family, year, shape, material_map, source, display_order";
+    "created_at, updated_at, body_class, family, year, shape, material_map, source, display_order, analysis";
 
 static Vehicle read_vehicle(const Stmt& s) {
     Vehicle v;
@@ -384,6 +385,7 @@ static Vehicle read_vehicle(const Stmt& s) {
     v.material_map = parse_json_or(s.col_text(16), json::object());
     v.source = s.col_text(17);
     v.display_order = s.col_int(18);
+    v.analysis = parse_json_or(s.col_text(19), json::object());
     return v;
 }
 
@@ -567,6 +569,50 @@ bool Database::update_vehicle_model(int id, const std::string& model_file) {
     if (model_file.empty()) s.bind_null(1); else s.bind(1, model_file);
     s.bind(2, current_iso_time()).bind(3, id);
     return s.exec();
+}
+
+bool Database::set_vehicle_analysis(int id, const json& analysis) {
+    KRAFT_LOCK;
+    Stmt s(db_, "UPDATE vehicles SET analysis = ?, updated_at = ? WHERE id = ?");
+    s.bind(1, analysis.dump()).bind(2, current_iso_time()).bind(3, id);
+    return s.exec() && sqlite3_changes(db_) > 0;
+}
+
+bool Database::apply_original_finish(int vehicle_id, const std::string& role, const OptionChoice& choice) {
+    KRAFT_LOCK;
+    // The colour category is the first one whose choices restyle this role.
+    int cat_id = 0;
+    {
+        Stmt s(db_,
+               "SELECT c.id FROM option_categories c JOIN option_choices o ON o.category_id = c.id "
+               "WHERE c.vehicle_id = ? AND o.code <> ? AND o.visual LIKE ? "
+               "ORDER BY c.display_order ASC, c.id ASC LIMIT 1");
+        s.bind(1, vehicle_id).bind(2, choice.code).bind(3, "%\"role\":\"" + role + "\"%");
+        if (s.row()) cat_id = s.col_int(0);
+    }
+    if (!cat_id) return false;
+    return transaction([&]() {
+        Stmt clear(db_, "UPDATE option_choices SET is_default = 0 WHERE category_id = ?");
+        if (!clear.bind(1, cat_id).exec()) return false;
+        int existing = 0;
+        {
+            Stmt f(db_, "SELECT id FROM option_choices WHERE category_id = ? AND code = ?");
+            f.bind(1, cat_id).bind(2, choice.code);
+            if (f.row()) existing = f.col_int(0);
+        }
+        if (existing) {
+            Stmt u(db_,
+                   "UPDATE option_choices SET name = ?, description = ?, price_delta = ?, swatch_hex = ?, finish = ?, "
+                   "visual = ?, tag = ?, is_default = 1, display_order = ? WHERE id = ?");
+            u.bind(1, choice.name).bind(2, choice.description).bind(3, choice.price_delta).bind(4, choice.swatch_hex)
+                .bind(5, choice.finish).bind(6, choice.visual.dump()).bind(7, choice.tag).bind(8, choice.display_order)
+                .bind(9, existing);
+            return u.exec();
+        }
+        OptionChoice c = choice;
+        c.is_default = true;
+        return insert_choice(cat_id, c) > 0;
+    });
 }
 
 bool Database::update_vehicle_model_by_slug(const std::string& slug, const std::string& model_file) {

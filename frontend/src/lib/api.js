@@ -62,6 +62,8 @@ export const api = {
 
   createVehicle: (payload) => request(`/vehicles/`, { method: "POST", body: json(payload) }),
   updateVehicle: (id, payload) => request(`/vehicles/${id}/`, { method: "PATCH", body: json(payload) }),
+  // Store the model analyser's report; the engine adds the detected original finish as an option.
+  saveAnalysis: (id, analysis) => request(`/vehicles/${id}/analysis`, { method: "PUT", body: json(analysis) }),
   deleteVehicle: (id, deleteFile = false) => request(`/vehicles/${id}/?delete_file=${deleteFile ? 1 : 0}`, { method: "DELETE" }),
   listModels: () => request("/models"),
   deleteModel: (filename) => request(`/models/${encodeURIComponent(filename)}`, { method: "DELETE" }),

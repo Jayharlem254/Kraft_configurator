@@ -64,10 +64,21 @@ Configurations can be saved (`My Garage`), reopened by an 8-character **Kraft co
 | `Stage.js` | Renderer: render-on-demand loop, adaptive pixel ratio while orbiting, static shadow map, camera tweens, cut-away interior view, environments (studio, gallery, dusk, night), snapshots |
 | `materials.js` | Role-based PBR material library (paint, rims, calipers, interior, hull, deck, sail, …) and the finish presets |
 | `procedural/car.js`, `bike.js`, `boat.js` | Parametric vehicle builders; structural options (wheel design, spoiler, roof, engines, T-top, luggage, …) rebuild geometry |
-| `glb.js` | Uploaded models: Draco/Meshopt decoding, orientation and scale normalisation, automatic role detection by material name |
+| `glb.js` | Uploaded models: Draco/Meshopt decoding, then analysis (below) and role binding by material name plus geometry |
+| `analyze.js` | Model analyser: clean-up, arrangement, part detection, highlights and the original finish |
 | `thumbnails.js` | Gallery thumbnails rendered from the same engine through one shared hidden WebGL context, cached in localStorage |
 
-Uploaded GLBs bind roles by material name (`carpaint`, `rim`/`jante`, `caliper`, `seat`, `hull`, …). When nothing matches, the largest light-coloured material becomes the paint. You can override this per vehicle with `material_map` (`PATCH /api/vehicles/:id {"material_map": {"paint": ["MyBodyMat"]}}`).
+### Model analysis
+
+Every uploaded model is analysed when it loads (`analyze.js`), so it works even when its material names mean nothing:
+
+- **Clean-up:** removes ground planes, backdrops and sky domes baked into the file.
+- **Arrange:** stands up models that are Z-up, lying on their side or upside-down, and turns them to face forward. It uses light colours (red at the back), part names and, for boats, the narrow bow. It scales the model to a plausible length and sits it on its tyres.
+- **Detect parts:** finds wheels from round geometry near the ground, including exports that merge all four tyres into one mesh. It finds glass from transparency, lights from emission, the cabin from the glasshouse, and from those the tyres, rims, calipers, interior and body paint.
+- **Highlights:** ranks the model's best features (wheels with an estimated rim size, headlights, tail lights, interior, rear wing, exhaust, engine, glass roof, profile). Each gets a camera shot in the configurator's *Highlights* panel, with an automatic *Tour*, and the analysis picks the best opening angle.
+- **Original finish:** the report is stored with `PUT /api/vehicles/:id/analysis`. The engine then adds the model's own paint as an **Original finish** option and makes it the default. Choosing it restores the artist's material exactly, textures included.
+
+Material names still win when they are clear (`carpaint`, `rim`/`jante`, `caliper`, `seat`, `hull`, …), and you can override any role per vehicle with `material_map` (`PATCH /api/vehicles/:id {"material_map": {"paint": ["MyBodyMat"]}}`). Studio analyses each model straight after upload and shows a report; older uploads are analysed the first time they are opened.
 
 ## Engine (`backend-cpp`)
 
@@ -102,6 +113,7 @@ The database defaults to `backend-cpp/bin/kraft_configurator.db`. Migrations are
 | `POST /api/configurations/` | save (re-evaluated server-side) → returns `code` |
 | `GET/PATCH/DELETE /api/configurations/:id-or-code/` | load, update or delete a saved build |
 | `POST /api/vehicles/upload` | multipart 3D upload (`file`, `name`, `vehicle_type`, `body_class`, `base_price` or `vehicle_id`) |
+| `PUT /api/vehicles/:id/analysis` | store the model analyser's report; adds/refreshes the *Original finish* option (`ORIG`) and makes it the default |
 | `POST /api/vehicles/`, `PATCH/DELETE /api/vehicles/:id/` | catalog management |
 | `GET /api/models`, `DELETE /api/models/:filename` | model files |
 

@@ -1,10 +1,11 @@
-// GLB/GLTF ingestion: decode (Draco + Meshopt), normalise orientation/scale,
-// and bind materials to configurator roles by name heuristics (overridable per
-// vehicle through `material_map`).
-import { Box3, MeshPhysicalMaterial, Vector3 } from "three";
+// GLB/GLTF ingestion: decode (Draco + Meshopt), arrange and analyse the model
+// (analyze.js), and bind materials to configurator roles by name heuristics plus
+// geometry (overridable per vehicle through `material_map`).
+import { MeshPhysicalMaterial } from "three";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
+import { analyzeModel, describeFinish } from "./analyze.js";
 
 let loader = null;
 function getLoader() {
@@ -68,30 +69,13 @@ function toPhysical(m) {
   return p;
 }
 
-// Prepare a loaded GLTF for the stage. Returns { group, roles, length }.
+// Prepare a loaded GLTF for the stage: arrange + analyse it (analyze.js), then
+// bind materials to roles. Name matches (and explicit `material_map` overrides)
+// win; the geometric analysis fills every role the names leave open.
+// Returns { group, roles, boundRoles, length, analysis, anchors }.
 export function prepareGLTF(gltf, { kind = "car", length, materialMap = {} } = {}, mats) {
   const scene = gltf.scene.clone(true);
-
-  // Orientation: lay the longest horizontal axis along x.
-  let box = new Box3().setFromObject(scene);
-  let size = box.getSize(new Vector3());
-  if (size.z > size.x * 1.15) {
-    scene.rotation.y = Math.PI / 2;
-    scene.updateMatrixWorld(true);
-    box = new Box3().setFromObject(scene);
-    size = box.getSize(new Vector3());
-  }
-
-  // Scale to a plausible real-world length for the vehicle type.
-  const target = length ?? (kind === "bike" ? 2.1 : kind === "boat" ? 9 : 4.6);
-  const s = target / Math.max(size.x, 0.001);
-  scene.scale.multiplyScalar(s);
-  scene.updateMatrixWorld(true);
-  box = new Box3().setFromObject(scene);
-  const center = box.getCenter(new Vector3());
-  scene.position.x -= center.x;
-  scene.position.z -= center.z;
-  scene.position.y -= box.min.y;
+  const { group, analysis, materialRoles } = analyzeModel(scene, { kind, length });
 
   // Explicit overrides first: material_map = { paint: ["MAT_Body", ...], ... }.
   const overrides = new Map();
@@ -99,10 +83,11 @@ export function prepareGLTF(gltf, { kind = "car", length, materialMap = {} } = {
     for (const n of [].concat(names)) overrides.set(String(n).toLowerCase(), role);
   }
 
+  const paintRole = kind === "boat" ? "hull" : "paint";
   const converted = new Map(); // original material -> physical clone
-  const roleOf = new Map(); // physical clone -> role
-  const areaByMat = new Map();
-  scene.traverse((node) => {
+  const named = new Map(); // physical clone -> role from names
+  const geometric = new Map(); // physical clone -> role from geometry
+  group.traverse((node) => {
     if (!node.isMesh) return;
     node.castShadow = true;
     node.receiveShadow = true;
@@ -125,45 +110,60 @@ export function prepareGLTF(gltf, { kind = "car", length, materialMap = {} } = {
             role = ROLE_PATTERNS.find(([, re]) => re.test(hay))?.[0] ?? null;
           }
         }
-        if (role) roleOf.set(phys, role);
+        if (role) named.set(phys, role);
+        const geo = materialRoles.get(orig);
+        if (geo) geometric.set(phys, geo);
       }
-      const phys = converted.get(orig);
-      const tris = (node.geometry.index?.count ?? node.geometry.attributes.position?.count ?? 0) / 3;
-      areaByMat.set(phys, (areaByMat.get(phys) ?? 0) + tris);
-      return phys;
+      return converted.get(orig);
     });
     node.material = Array.isArray(node.material) ? next : next[0];
   });
 
-  // No paint found by name: the busiest opaque, non-dark material is almost
-  // always the body shell.
-  const paintRole = kind === "boat" ? "hull" : "paint";
-  if (![...roleOf.values()].includes(paintRole)) {
-    let best = null;
-    let bestScore = 0;
-    for (const [m, tris] of areaByMat) {
-      if (roleOf.has(m) || m.transparent || m.opacity < 1) continue;
-      const lum = m.color ? m.color.r * 0.3 + m.color.g * 0.59 + m.color.b * 0.11 : 0;
-      const score = tris * (lum > 0.08 ? 1 : 0.25);
-      if (score > bestScore) {
-        best = m;
-        bestScore = score;
-      }
-    }
-    if (best) roleOf.set(best, paintRole);
+  // Merge: names first; geometry for unnamed materials, and for single-owner
+  // roles (paint/hull, interior) only when names found nothing for that role.
+  const roleOf = new Map(named);
+  const namedRoles = new Set(named.values());
+  for (const [m, role] of geometric) {
+    if (roleOf.has(m)) continue;
+    if ((role === paintRole || role === "interior") && namedRoles.has(role)) continue;
+    roleOf.set(m, role);
   }
 
-  // Roles we restyle. Glass, tyres and discs keep the artist's materials.
+  // Roles we restyle. Glass, tyres, discs and lamps keep the artist's materials.
   const restyle = new Set(["paint", "hull", "rims", "calipers", "interior", "seat", "frame", "deck", "exhaust"]);
   const roles = {};
+  const boundRoles = new Set();
   for (const [m, role] of roleOf) {
     roles[role] = (roles[role] ?? 0) + 1;
     if (!restyle.has(role)) continue;
-    // Painted surfaces drop a baked colour map so the chosen colour reads true.
-    if (role === "paint" || role === "hull") m.map = null;
+    // Remember the artist's look so "Original finish" can bring it back.
+    m.userData.original = snapshotMaterial(m);
+    // Painted surfaces drop a baked colour map so a chosen colour reads true.
+    if (role === "paint" || role === "hull") m.userData.dropMapOnRestyle = true;
     m.needsUpdate = true;
     mats.bind(role, m);
+    boundRoles.add(role);
   }
 
-  return { group: scene, roles, length: target };
+  // Report what was actually bound (names + geometry), not only the guesses.
+  analysis.roles = {};
+  for (const [m, role] of roleOf) (analysis.roles[role] ??= []).push(m.name || "(unnamed)");
+  const paintMat = [...roleOf].find(([, r]) => r === paintRole)?.[0];
+  if (paintMat && (!analysis.originalPaint || named.get(paintMat) === paintRole)) analysis.originalPaint = describeFinish(paintMat, paintRole);
+  analysis.boundRoles = [...boundRoles];
+
+  return { group, roles, boundRoles, length: analysis.dims.length, analysis, anchors: analysis.anchors };
+}
+
+function snapshotMaterial(m) {
+  return {
+    color: m.color?.clone(),
+    map: m.map ?? null,
+    metalness: m.metalness,
+    roughness: m.roughness,
+    clearcoat: m.clearcoat ?? 0,
+    clearcoatRoughness: m.clearcoatRoughness ?? 0,
+    iridescence: m.iridescence ?? 0,
+    sheen: m.sheen ?? 0,
+  };
 }

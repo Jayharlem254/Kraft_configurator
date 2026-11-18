@@ -467,6 +467,54 @@ int main(int argc, char* argv[]) {
         send_json(res, def ? def->detail_json() : json::object(), 201);
     });
 
+    // Store the 3D model analyser's report (computed in the browser, where the
+    // model is decoded). When it detected the model's own paint, the engine adds
+    // that as an "Original finish" option and makes it the default.
+    svr.Put(R"(/api/vehicles/([0-9]+)/analysis/?)", [&](const httplib::Request& req, httplib::Response& res) {
+        int id = std::stoi(req.matches[1]);
+        auto v = db.get_vehicle_by_id(id);
+        if (!v) return send_error(res, 404, "Vehicle not found");
+        if (req.body.size() > 512 * 1024) return send_error(res, 413, "Analysis report too large");
+        json body = json::parse(req.body.empty() ? "{}" : req.body, nullptr, false);
+        if (body.is_discarded() || !body.is_object()) return send_error(res, 400, "Analysis must be a JSON object");
+        if (!db.set_vehicle_analysis(id, body)) return send_error(res, 500, "Failed to store analysis");
+
+        bool finish_added = false;
+        auto paint = body.find("original_paint");
+        if (paint != body.end() && paint->is_object()) {
+            auto str = [&](const char* k, const std::string& fb) {
+                auto it = paint->find(k);
+                return it != paint->end() && it->is_string() ? it->get<std::string>() : fb;
+            };
+            static const std::vector<std::string> finishes = {"solid", "gloss", "metallic", "pearl", "matte", "satin",
+                                                              "chrome", "titanium", "carbon"};
+            std::string color = lower(str("color", ""));
+            std::string finish = str("finish", "gloss");
+            std::string role = str("role", v->vehicle_type == "boat" ? "hull" : "paint");
+            bool hex = color.size() == 7 && color[0] == '#' &&
+                       std::all_of(color.begin() + 1, color.end(), [](unsigned char c) { return std::isxdigit(c); });
+            if (std::find(finishes.begin(), finishes.end(), finish) == finishes.end()) finish = "gloss";
+            if (hex && (role == "paint" || role == "hull")) {
+                kraft::OptionChoice c;
+                c.code = "ORIG";
+                c.name = "Original finish";
+                c.description = "The finish this model was created in, detected from the 3D file.";
+                c.swatch_hex = color;
+                c.finish = finish;
+                c.visual = json::array({{{"role", role}, {"color", color}, {"finish", finish}, {"original", true}}});
+                c.tag = "Detected";
+                c.is_default = true;
+                c.display_order = 0;
+                finish_added = db.apply_original_finish(id, role, c);
+            }
+        }
+        cache.invalidate();
+        auto def = cache.get()->find(std::to_string(id));
+        json out = def ? def->detail_json() : json::object();
+        out["original_finish_added"] = finish_added;
+        send_json(res, out);
+    });
+
     auto update_vehicle = [&](const httplib::Request& req, httplib::Response& res) {
         int id = std::stoi(req.matches[1]);
         auto v = db.get_vehicle_by_id(id);

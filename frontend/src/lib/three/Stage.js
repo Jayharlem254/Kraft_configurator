@@ -246,7 +246,16 @@ export class Stage {
       const gltf = await loadGLTF(spec.modelUrl, onProgress);
       if (token !== this.loadToken) return false;
       const prepared = prepareGLTF(gltf, { kind: spec.kind, length: spec.shape?.length, materialMap: spec.materialMap }, mats);
-      built = { group: prepared.group, cutaway: [], anchors: null, length: prepared.length, glb: true, roles: prepared.roles };
+      built = {
+        group: prepared.group,
+        cutaway: [],
+        anchors: prepared.anchors,
+        length: prepared.length,
+        glb: true,
+        roles: prepared.roles,
+        boundRoles: prepared.boundRoles,
+        analysis: prepared.analysis,
+      };
     } else {
       built = this.buildProcedural(spec, visual.parts ?? {}, mats);
     }
@@ -291,6 +300,7 @@ export class Stage {
       center: box.getCenter(new Vector3()),
     };
     this.cutaway = built.cutaway ?? [];
+    this.highlights = built.analysis?.highlights ?? [];
     this.applyCutaway(this.cutawayActive);
 
     // Fit lights and ground to the model.
@@ -329,10 +339,29 @@ export class Stage {
   }
 
   // ---- Camera ------------------------------------------------------------------
+  // Named presets, or "hl:<id>" for a highlight found by the model analyser.
+  // Uploaded models have no cut-away, so "interior" uses the analysed cabin shot.
+  resolveView(name) {
+    const hl = (id) => this.highlights?.find((h) => h.id === id);
+    if (name?.startsWith("hl:")) {
+      const h = hl(name.slice(3));
+      if (h) return { dir: h.dir, fit: h.fit, point: h.target };
+    }
+    if (name === "interior" && this.current?.built?.glb && hl("interior")) {
+      const h = hl("interior");
+      return { dir: h.dir, fit: h.fit, point: h.target };
+    }
+    return VIEWS[name] ?? VIEWS.front34;
+  }
+
   viewPose(name) {
-    const v = VIEWS[name] ?? VIEWS.front34;
+    const v = this.resolveView(name);
     const dir = new Vector3(...v.dir).normalize();
-    const target = v.target ? this.anchors[v.target].clone() : new Vector3(0, (this.bounds?.max.y ?? 1.2) * 0.38, 0);
+    const target = v.point
+      ? v.point.clone()
+      : v.target
+        ? this.anchors[v.target].clone()
+        : new Vector3(0, (this.bounds?.max.y ?? 1.2) * 0.38, 0);
     const fov = (this.camera.fov * Math.PI) / 180;
     const aspectFit = Math.max(1, 1.5 / Math.max(this.camera.aspect, 0.5));
     const dist = ((this.size * 0.62) / Math.tan(fov / 2)) * v.fit * aspectFit;

@@ -147,6 +147,7 @@ struct Vehicle {
     std::optional<std::string> thumbnail;
     json shape = json::object();         // procedural 3D parameters
     json material_map = json::object();  // role -> [material/mesh names] overrides for GLBs
+    json analysis = json::object();      // 3D model analyser report (wheels, parts, highlights, original finish)
     bool is_published = false;
     int display_order = 0;
     std::string created_at;
@@ -168,6 +169,7 @@ struct Vehicle {
             {"thumbnail", opt_str(thumbnail)},
             {"shape", shape},
             {"material_map", material_map},
+            {"analysis", analysis},
             {"source", source},
             {"is_published", is_published},
         };

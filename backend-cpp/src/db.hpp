@@ -71,6 +71,11 @@ public:
     std::optional<Vehicle> insert_vehicle(const Vehicle& v);
     bool update_vehicle_core(const Vehicle& v);  // all scalar fields incl. shape/material_map
     bool update_vehicle_model(int id, const std::string& model_file);
+    bool set_vehicle_analysis(int id, const json& analysis);
+    // Insert or refresh a detected "original finish" choice in the vehicle's
+    // paint (or hull) colour category and make it that category's default.
+    // Existing choices keep their ids, so saved configurations stay valid.
+    bool apply_original_finish(int vehicle_id, const std::string& role, const OptionChoice& choice);
     bool update_vehicle_model_by_slug(const std::string& slug, const std::string& model_file);
     bool clear_vehicle_model_by_file(const std::string& filename);
     bool delete_vehicle(int id);

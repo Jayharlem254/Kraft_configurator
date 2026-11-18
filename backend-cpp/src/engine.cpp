@@ -52,6 +52,7 @@ static double from_price(const VehicleDef& d) {
 json VehicleDef::list_json() const {
     json j = vehicle.base_json();
     j.erase("material_map");
+    j.erase("analysis");
     json vars = json::array();
     for (const auto& v : variants) vars.push_back(v.to_json());
     j["variants"] = vars;

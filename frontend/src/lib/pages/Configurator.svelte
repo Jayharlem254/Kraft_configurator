@@ -8,6 +8,7 @@
   import Icon from "../components/Icon.svelte";
   import OptionCategory from "../components/OptionCategory.svelte";
   import StageView from "../components/StageView.svelte";
+  import { needsAnalysis, storeAnalysis } from "../modelAnalysis.js";
 
   let { slug } = $props();
 
@@ -30,6 +31,58 @@
   let saveState = $state(null); // null | "saving" | { code } | { error }
   let stageEl = $state(null);
   let stage = null;
+
+  // ---- Model analysis: highlights, hero angle, preview coverage ----------------
+  let analysis = $state(null);
+  let previewRoles = $state(null); // roles an uploaded model can show (null = procedural, all)
+  let touring = $state(false);
+  let cameraTouched = false;
+  let backfilled = false;
+  let tourTimer = null;
+  const highlights = $derived(analysis?.highlights ?? []);
+  const activeHighlight = $derived(view.startsWith("hl:") ? highlights.find((h) => `hl:${h.id}` === view) : null);
+
+  function onBuilt(built) {
+    analysis = built.analysis ?? null;
+    previewRoles = built.glb ? new Set(built.boundRoles ?? []) : null;
+    // Open on the model's best side unless the user already moved the camera.
+    if (analysis?.hero && !cameraTouched && view === "front34") view = analysis.hero;
+    // Older uploads (or a replaced model) get analysed once and stored, so the
+    // engine can offer the model's original finish.
+    if (analysis && v && needsAnalysis(v) && !backfilled) {
+      backfilled = true;
+      storeAnalysis(v, analysis)
+        .then(() => cfg.load(v.slug, { variant: cfg.result?.variant ?? cfg.variant, selections: $state.snapshot(cfg.selections) }))
+        .catch((e) => console.warn("Could not store model analysis", e));
+    }
+  }
+
+  function showHighlight(h) {
+    stopTour();
+    cameraTouched = true;
+    view = `hl:${h.id}`;
+  }
+
+  function startTour() {
+    if (!highlights.length) return;
+    touring = true;
+    autoRotate = false;
+    let i = Math.max(0, highlights.findIndex((h) => `hl:${h.id}` === view) + 1) % highlights.length;
+    const step = () => {
+      view = `hl:${highlights[i].id}`;
+      i = (i + 1) % highlights.length;
+    };
+    step();
+    tourTimer = setInterval(step, 3800);
+  }
+
+  function stopTour() {
+    touring = false;
+    clearInterval(tourTimer);
+    tourTimer = null;
+  }
+
+  $effect(() => () => clearInterval(tourTimer));
 
   const SECTION_VIEWS = { exterior: "front34", wheels: "wheel", interior: "interior", performance: "rear34", technology: "front34", comfort: "interior", packages: "side" };
   const VIEW_BUTTONS = [
@@ -64,6 +117,7 @@
   });
 
   function pickSection(s) {
+    stopTour();
     section = s;
     search = "";
     if (autoCamera) view = SECTION_VIEWS[s] ?? "front34";
@@ -168,7 +222,20 @@
     <div class="main">
       <div class="stage-col">
         <div class="stage-host" bind:this={stageEl}>
-          <StageView vehicle={v} visual={cfg.visual} {view} {environment} {autoRotate} onstage={(s) => (stage = s)} oninteract={() => (autoRotate = false)} />
+          <StageView
+            vehicle={v}
+            visual={cfg.visual}
+            {view}
+            {environment}
+            {autoRotate}
+            onstage={(s) => (stage = s)}
+            onbuilt={onBuilt}
+            oninteract={() => {
+              autoRotate = false;
+              cameraTouched = true;
+              stopTour();
+            }}
+          />
         </div>
 
         <div class="toasts" aria-live="polite">
@@ -196,6 +263,28 @@
           <button class="icon-btn glass" title="Fullscreen" aria-label="Fullscreen" onclick={toggleFullscreen}><Icon name="fullscreen" /></button>
         </div>
 
+        {#if highlights.length > 1}
+          <div class="highlights" aria-label="Model highlights">
+            <div class="hl-head">
+              <p class="xsmall muted">Highlights</p>
+              <button class="hl-tour" onclick={() => (touring ? stopTour() : startTour())} aria-pressed={touring}>
+                <Icon name={touring ? "pause" : "rotate"} size={14} />
+                {touring ? "Stop" : "Tour"}
+              </button>
+            </div>
+            <ul>
+              {#each highlights as h (h.id)}
+                <li>
+                  <button class:active={activeHighlight?.id === h.id} onclick={() => showHighlight(h)}>
+                    <span class="hl-label">{h.label}</span>
+                    <span class="hl-detail xsmall">{h.detail}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+
         {#if paintChoice}
           <div class="paint-label">
             <p class="xsmall muted">{paintCategory.name}</p>
@@ -205,7 +294,14 @@
 
         <div class="views" role="group" aria-label="Camera views">
           {#each VIEW_BUTTONS as [key, label]}
-            <button class:active={view === key} onclick={() => (view = key)}>{label}</button>
+            <button
+              class:active={view === key}
+              onclick={() => {
+                stopTour();
+                cameraTouched = true;
+                view = key;
+              }}>{label}</button
+            >
           {/each}
           <label class="auto" title="Move the camera when switching sections">
             <input type="checkbox" bind:checked={autoCamera} /> Auto
@@ -229,7 +325,7 @@
             {#each Array(4) as _}<div class="skeleton" style="height:120px;margin:20px 0;border-radius:8px"></div>{/each}
           {:else}
             {#each visibleCategories as category (category.id)}
-              <OptionCategory {category} {cfg} {filter} />
+              <OptionCategory {category} {cfg} {filter} {previewRoles} />
             {/each}
             {#if filter && !visibleCategories.some((c) => c.choices.some((x) => `${x.name} ${x.code} ${x.description}`.toLowerCase().includes(filter)))}
               <p class="muted small empty">No options match “{search}”.</p>
@@ -456,6 +552,73 @@
   }
   .auto input {
     accent-color: var(--ink);
+  }
+  .highlights {
+    position: absolute;
+    left: clamp(16px, 2vw, 32px);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 210px;
+    max-height: calc(100% - 200px);
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-1);
+    padding: 10px 6px 6px;
+    z-index: 2;
+  }
+  .hl-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px 6px;
+  }
+  .hl-tour {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--ink-2);
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+  .hl-tour:hover,
+  .hl-tour[aria-pressed="true"] {
+    background: var(--ink);
+    color: #fff;
+  }
+  .highlights ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .highlights li button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    text-align: left;
+    padding: 7px 8px;
+    border-radius: 6px;
+    transition: background 0.15s var(--ease);
+  }
+  .highlights li button:hover {
+    background: rgba(14, 14, 18, 0.06);
+  }
+  .highlights li button.active {
+    background: var(--ink);
+    color: #fff;
+  }
+  .highlights li button.active .hl-detail {
+    color: rgba(255, 255, 255, 0.75);
+  }
+  .hl-label {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .hl-detail {
+    color: var(--ink-3);
   }
   .paint-label {
     position: absolute;
@@ -737,7 +900,8 @@
     .sep {
       display: none;
     }
-    .env {
+    .env,
+    .highlights {
       display: none;
     }
     .views {

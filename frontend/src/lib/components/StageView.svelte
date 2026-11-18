@@ -11,6 +11,7 @@
     autoRotate = false,
     interactive = true,
     onstage = () => {},
+    onbuilt = () => {},
     oninteract = () => {},
   } = $props();
 
@@ -52,11 +53,12 @@
       .then((built) => {
         if (!built) return;
         loading = false;
+        onbuilt(built);
         // Capture a real gallery thumbnail for uploaded models.
         if (v.model_file) {
           requestAnimationFrame(() => {
             try {
-              storeSnapshot(v, stage.snapshot({ width: 960, height: 600, type: "image/webp", quality: 0.85, view: "front34" }));
+              storeSnapshot(v, stage.snapshot({ width: 960, height: 600, type: "image/webp", quality: 0.85, view: built.analysis?.hero ?? "front34" }));
             } catch {
               /* ignore */
             }
