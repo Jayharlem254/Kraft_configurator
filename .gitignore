@@ -26,3 +26,7 @@ media/
 .vscode/
 .idea/
 *.swp
+
+# SQLite runtime files
+*.db-wal
+*.db-shm
