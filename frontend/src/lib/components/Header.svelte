@@ -1,128 +1,167 @@
 <script>
-  export let mode = "gallery"; // "gallery" | "configurator"
-  export let vehicleType = "all";
-  export let onSelectType = () => {};
-  export let activeVehicleName = "";
-  export let onBack = () => {};
+  import { route } from "../router.svelte.js";
+  import Icon from "./Icon.svelte";
 
-  const types = [
-    { id: "all", label: "All" },
-    { id: "car", label: "Cars" },
-    { id: "boat", label: "Boats" },
-    { id: "bike", label: "Bikes" },
+  let { engine = null } = $props();
+
+  const NAV = [
+    { href: "#/", label: "Models", match: (s) => !s[0] || s[0] === "models" || s[0] === "compare" },
+    { href: "#/garage", label: "My Garage", match: (s) => s[0] === "garage" },
+    { href: "#/studio", label: "Studio", match: (s) => s[0] === "studio" },
   ];
+
+  let menuOpen = $state(false);
+  $effect(() => {
+    route.path;
+    menuOpen = false;
+  });
 </script>
 
-<header>
-  <div class="wordmark">
-    KRAFT<span class="accent">.</span>
-    <span class="mono-label subtitle">CONFIGURATOR</span>
-  </div>
+<header class="header no-print">
+  <div class="inner">
+    <a class="brand" href="#/" aria-label="Kraft — all models">
+      <span class="mark">KRAFT</span>
+      <span class="sub">Configurator</span>
+    </a>
 
-  {#if mode !== "gallery"}
-    <button class="back mono-label" on:click={onBack}>← BACK</button>
-    {#if activeVehicleName}
-      <span class="mono-label current">{activeVehicleName}</span>
-    {/if}
-  {:else}
-    <nav>
-      {#each types as t}
-        <button
-          class="tab mono-label"
-          class:active={vehicleType === t.id}
-          on:click={() => onSelectType(t.id)}
-        >
-          {t.label}
-        </button>
+    <nav class="nav" class:open={menuOpen} aria-label="Primary">
+      {#each NAV as item}
+        <a href={item.href} class:active={item.match(route.segments)}>{item.label}</a>
       {/each}
     </nav>
-  {/if}
 
-  <div class="mono-label status">
-    <span class="dot"></span>
-    SYS // ONLINE
+    <div class="right">
+      <span
+        class="engine"
+        class:online={engine?.status === "online"}
+        title={engine
+          ? `C++ engine ${engine.version} · ${engine.vehicles_count} vehicles · rules avg ${Math.round(engine.rules?.avg_us ?? 0)} µs`
+          : "Engine offline"}
+      >
+        <span class="dot"></span>
+        <span class="xsmall">{engine?.status === "online" ? "Engine online" : "Engine offline"}</span>
+      </span>
+      <button class="icon-btn menu" aria-label="Menu" aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)}>
+        <Icon name={menuOpen ? "close" : "list"} />
+      </button>
+    </div>
   </div>
 </header>
 
 <style>
-  header {
-    display: flex;
-    align-items: center;
-    gap: 32px;
-    padding: 18px 28px;
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: var(--header-h);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: saturate(180%) blur(12px);
     border-bottom: 1px solid var(--line);
-    background: var(--void);
   }
-
-  .wordmark {
-    font-family: var(--font-display);
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    display: flex;
+  .inner {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 0 clamp(16px, 3vw, 40px);
+  }
+  .brand {
+    display: inline-flex;
     align-items: baseline;
     gap: 10px;
+    justify-self: start;
   }
-  .accent {
-    color: var(--purple-500);
+  .mark {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.32em;
   }
-  .subtitle {
-    font-size: 10px;
-    color: var(--text-tertiary);
+  .sub {
+    font-size: 13px;
+    color: var(--ink-3);
+    letter-spacing: 0.02em;
   }
-
-  nav {
+  .nav {
     display: flex;
-    gap: 6px;
-    margin-left: auto;
+    gap: 32px;
   }
-
-  .back {
-    background: transparent;
-    border: 1px solid var(--line);
-    color: var(--text-secondary);
-    padding: 8px 16px;
-    border-radius: var(--radius-sm);
-    margin-left: auto;
-    transition: border-color 0.15s, color 0.15s;
+  .nav a {
+    position: relative;
+    font-size: 15px;
+    color: var(--ink-2);
+    padding: 20px 0;
+    transition: color 0.15s var(--ease);
   }
-  .back:hover {
-    border-color: var(--line-strong);
-    color: var(--text-primary);
+  .nav a:hover,
+  .nav a.active {
+    color: var(--ink);
   }
-
-  .current {
-    color: var(--purple-300);
+  .nav a.active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 12px;
+    height: 2px;
+    background: var(--ink);
   }
-
-  .tab {
-    background: transparent;
-    border: 1px solid var(--line);
-    color: var(--text-secondary);
-    padding: 8px 16px;
-    border-radius: var(--radius-sm);
-    transition: border-color 0.15s, color 0.15s;
-  }
-  .tab:hover {
-    border-color: var(--line-strong);
-    color: var(--text-primary);
-  }
-  .tab.active {
-    border-color: var(--purple-500);
-    color: var(--purple-300);
-  }
-
-  .status {
+  .right {
+    justify-self: end;
     display: flex;
     align-items: center;
     gap: 8px;
-    color: var(--text-secondary);
+  }
+  .engine {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink-3);
   }
   .dot {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
+    background: var(--danger);
+  }
+  .engine.online .dot {
     background: var(--success);
-    box-shadow: 0 0 6px var(--success);
+    box-shadow: 0 0 0 3px rgba(25, 126, 16, 0.15);
+  }
+  .menu {
+    display: none;
+  }
+
+  @media (max-width: 760px) {
+    .inner {
+      grid-template-columns: 1fr auto;
+    }
+    .engine .xsmall,
+    .sub {
+      display: none;
+    }
+    .menu {
+      display: inline-grid;
+    }
+    .nav {
+      display: none;
+      position: absolute;
+      top: var(--header-h);
+      left: 0;
+      right: 0;
+      flex-direction: column;
+      gap: 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--line);
+      padding: 8px 16px 16px;
+    }
+    .nav.open {
+      display: flex;
+    }
+    .nav a {
+      padding: 12px 0;
+    }
+    .nav a.active::after {
+      display: none;
+    }
   }
 </style>

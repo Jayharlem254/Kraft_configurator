@@ -1,0 +1,830 @@
+{
+  "version": 3,
+  "templates": {
+    "car_paint": {
+      "name": "Exterior Colour", "slug": "exterior-colour", "section": "exterior", "display": "swatch", "role": "paint",
+      "description": "Solid, metallic, special and matte finishes with a two-layer clear coat.",
+      "options": [
+        {"code": "PS01", "name": "Arctic White", "hex": "#eeeeea", "finish": "solid", "price": 0, "default": true},
+        {"code": "PS02", "name": "Obsidian Black", "hex": "#0b0c0e", "finish": "solid", "price": 0},
+        {"code": "PS03", "name": "Signal Red", "hex": "#b3121b", "finish": "solid", "price": 0},
+        {"code": "PS04", "name": "Volt Yellow", "hex": "#f0c20c", "finish": "solid", "price": 0},
+        {"code": "PM01", "name": "Graphite Grey Metallic", "hex": "#4a4d52", "finish": "metallic", "price": 1200},
+        {"code": "PM02", "name": "Glacier Silver Metallic", "hex": "#b9bdc2", "finish": "metallic", "price": 1200},
+        {"code": "PM03", "name": "Abyss Blue Metallic", "hex": "#1b2c4f", "finish": "metallic", "price": 1200},
+        {"code": "PM04", "name": "Emerald Green Metallic", "hex": "#1f4a3a", "finish": "metallic", "price": 1200},
+        {"code": "PM05", "name": "Copper Bronze Metallic", "hex": "#7a4a2c", "finish": "metallic", "price": 1200},
+        {"code": "PP01", "name": "Sand Pearl", "hex": "#cbbd9f", "finish": "pearl", "price": 3800, "tag": "Special"},
+        {"code": "PP02", "name": "Aurora Violet", "hex": "#3e2a63", "finish": "pearl", "price": 4200, "tag": "Special"},
+        {"code": "PP03", "name": "Lava Orange", "hex": "#d4521c", "finish": "pearl", "price": 3800, "tag": "Special"},
+        {"code": "PX01", "name": "Frozen Grey Matte", "hex": "#7c8085", "finish": "matte", "price": 6500, "tag": "Exclusive"},
+        {"code": "PX02", "name": "Stealth Black Matte", "hex": "#18191c", "finish": "matte", "price": 6500, "tag": "Exclusive"},
+        {"code": "PX03", "name": "Liquid Chrome", "hex": "#d9dde2", "finish": "chrome", "price": 18500, "tag": "Exclusive"}
+      ]
+    },
+    "car_exterior_details": {
+      "name": "Exterior Details", "slug": "exterior-details", "section": "exterior", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "EX01", "name": "Exterior Package High-gloss Black", "desc": "Window trims, mirror caps and badges in high-gloss black.", "price": 1450, "visual": [{"role": "trim", "color": "#0a0a0b", "finish": "gloss"}], "excludes": ["EX02"]},
+        {"code": "EX02", "name": "Carbon Exterior Package", "desc": "Visible-weave carbon mirror caps, side blades and diffuser.", "price": 5600, "visual": [{"role": "trim", "color": "#1b1c1f", "finish": "carbon"}], "mods": {"weight_kg": -3}},
+        {"code": "EX03", "name": "Tinted LED Matrix Headlights", "desc": "Adaptive matrix beam with darkened inner housing.", "price": 1950, "visual": [{"role": "lights", "color": "#24272c"}]},
+        {"code": "EX04", "name": "Privacy Glass", "desc": "Darkened rear side and rear windows.", "price": 690, "visual": [{"role": "glass", "color": "#07080a", "opacity": 0.94}]},
+        {"code": "EX05", "name": "Racing Stripes", "desc": "Twin centre stripes across bonnet, roof and tail.", "price": 2400, "visual": [{"part": "stripes", "value": true}, {"role": "stripes", "color": "#f2f2ef", "finish": "gloss"}]}
+      ]
+    },
+    "car_roof": {
+      "name": "Roof", "slug": "roof", "section": "exterior", "display": "list",
+      "options": [
+        {"code": "RF01", "name": "Body-colour Roof", "price": 0, "default": true, "visual": [{"part": "roof", "value": "body"}]},
+        {"code": "RF02", "name": "Panoramic Glass Roof", "desc": "Fixed tinted glass panel with electric sun blind.", "price": 1950, "visual": [{"part": "roof", "value": "glass"}], "mods": {"weight_kg": 14}},
+        {"code": "RF03", "name": "Contrast Roof Gloss Black", "price": 1100, "visual": [{"part": "roof", "value": "contrast"}]},
+        {"code": "RF04", "name": "Carbon Fibre Roof", "desc": "Visible carbon roof panel, lowers the centre of gravity.", "price": 4900, "visual": [{"part": "roof", "value": "carbon"}], "mods": {"weight_kg": -6}, "tag": "Lightweight"}
+      ]
+    },
+    "car_wheels": {
+      "name": "Wheels", "slug": "wheels", "section": "wheels", "display": "tile",
+      "options": [
+        {"code": "WH01", "name": "19\" Aero Design", "desc": "Twin five-spoke, painted silver.", "price": 0, "default": true, "visual": [{"role": "rims", "color": "#c9ccd1", "finish": "metallic"}, {"part": "wheel", "value": {"spokes": 5, "style": "twin", "size": 19}}]},
+        {"code": "WH02", "name": "20\" Sport Classic", "desc": "Ten-spoke, platinum satin.", "price": 2100, "visual": [{"role": "rims", "color": "#aeb2b8", "finish": "satin"}, {"part": "wheel", "value": {"spokes": 10, "style": "classic", "size": 20}}]},
+        {"code": "WH03", "name": "20\" Split-spoke Platinum", "desc": "Seven split spokes, diamond-turned faces.", "price": 2600, "visual": [{"role": "rims", "color": "#8d9196", "finish": "metallic"}, {"part": "wheel", "value": {"spokes": 7, "style": "split", "size": 20}}]},
+        {"code": "WH04", "name": "21\" Forged Y-spoke Black", "desc": "Forged, gloss black, 8 kg lighter per set.", "price": 4300, "visual": [{"role": "rims", "color": "#151618", "finish": "gloss"}, {"part": "wheel", "value": {"spokes": 5, "style": "y", "size": 21}}], "mods": {"weight_kg": -8}},
+        {"code": "WH05", "name": "21\" Turbine Aero", "desc": "Aerodynamic turbine blades, anthracite.", "price": 3600, "visual": [{"role": "rims", "color": "#3a3d42", "finish": "metallic"}, {"part": "wheel", "value": {"spokes": 14, "style": "turbine", "size": 21}}], "mods": {"range_km": 6}},
+        {"code": "WH06", "name": "21\" Centre-lock Forged Magnesium", "desc": "Motorsport centre-lock, satin black. Requires Sport Chrono.", "price": 7800, "visual": [{"role": "rims", "color": "#26272a", "finish": "satin"}, {"part": "wheel", "value": {"spokes": 10, "style": "thin", "size": 21, "centerlock": true}}], "mods": {"weight_kg": -12}, "requires": ["PF01"], "tag": "Motorsport"}
+      ]
+    },
+    "car_calipers": {
+      "name": "Brake Calipers", "slug": "brake-calipers", "section": "wheels", "display": "swatch", "role": "calipers",
+      "options": [
+        {"code": "BC01", "name": "Black", "hex": "#141517", "price": 0, "default": true},
+        {"code": "BC02", "name": "Signal Red", "hex": "#c0161f", "price": 950},
+        {"code": "BC03", "name": "Acid Yellow", "hex": "#e2c81b", "price": 950},
+        {"code": "BC04", "name": "Silver", "hex": "#b8bcc1", "finish": "metallic", "price": 950},
+        {"code": "BC05", "name": "Electric Blue", "hex": "#1d5bd8", "price": 950}
+      ]
+    },
+    "car_tyres": {
+      "name": "Tyres", "slug": "tyres", "section": "wheels", "display": "list",
+      "options": [
+        {"code": "TY01", "name": "Summer Performance Tyres", "price": 0, "default": true},
+        {"code": "TY02", "name": "All-season Tyres", "price": 0, "mods": {"top_speed_kmh": -20}},
+        {"code": "TY03", "name": "Track Tyres (semi-slick)", "desc": "Road-legal semi-slicks for track days. Requires Sport Chrono.", "price": 1200, "requires": ["PF01"], "mods": {"accel_0_100_s": -0.1}, "tag": "Motorsport"}
+      ]
+    },
+    "car_interior_colour": {
+      "name": "Interior Colour", "slug": "interior-colour", "section": "interior", "display": "swatch", "role": "interior",
+      "options": [
+        {"code": "IC01", "name": "Jet Black Leather", "hex": "#141416", "price": 0, "default": true},
+        {"code": "IC02", "name": "Slate Grey Leather", "hex": "#4b4f55", "price": 0},
+        {"code": "IC03", "name": "Cognac Leather", "hex": "#8a4a24", "price": 2950},
+        {"code": "IC04", "name": "Bordeaux Red Leather", "hex": "#5a1420", "price": 2950},
+        {"code": "IC05", "name": "Ivory Chalk Leather", "hex": "#d8d0c0", "price": 2950},
+        {"code": "IC06", "name": "Two-tone Black / Signal Red", "hex": "#141416", "price": 3600, "visual": [{"role": "interior", "color": "#141416"}, {"role": "interior_accent", "color": "#b3121b"}]},
+        {"code": "IC07", "name": "Race-Tex Microfibre Black", "hex": "#1d1e21", "finish": "suede", "price": 4200}
+      ]
+    },
+    "car_seats": {
+      "name": "Seats", "slug": "seats", "section": "interior", "display": "list",
+      "options": [
+        {"code": "SE01", "name": "Comfort Seats, 8-way electric", "price": 0, "default": true},
+        {"code": "SE02", "name": "Sport Seats Plus, 14-way", "price": 1500},
+        {"code": "SE03", "name": "Adaptive Sport Seats, 18-way with memory", "price": 3900},
+        {"code": "SE04", "name": "Full Bucket Seats, carbon shell", "desc": "Folding backrest, integrated head restraints.", "price": 5900, "excludes": ["CF02", "CF07"], "mods": {"weight_kg": -12}, "tag": "Lightweight"}
+      ]
+    },
+    "car_trim": {
+      "name": "Interior Trim", "slug": "interior-trim", "section": "interior", "display": "list",
+      "options": [
+        {"code": "TR01", "name": "Brushed Aluminium", "price": 0, "default": true, "visual": [{"role": "interior_trim", "color": "#9aa0a6", "finish": "metallic"}]},
+        {"code": "TR02", "name": "Open-pore Walnut", "price": 1200, "visual": [{"role": "interior_trim", "color": "#5a3a22", "finish": "satin"}]},
+        {"code": "TR03", "name": "Carbon Fibre Matte", "price": 2900, "visual": [{"role": "interior_trim", "color": "#1a1b1d", "finish": "carbon"}]},
+        {"code": "TR04", "name": "Paint to Sample (body colour)", "price": 1800, "visual": [{"role": "interior_trim", "match": "paint"}]}
+      ]
+    },
+    "car_comfort": {
+      "name": "Comfort & Convenience", "slug": "comfort", "section": "comfort", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "CF01", "name": "Seat Heating, front", "price": 590},
+        {"code": "CF02", "name": "Seat Ventilation, front", "price": 980},
+        {"code": "CF03", "name": "Four-zone Climate Control", "price": 980, "mods": {"weight_kg": 6}},
+        {"code": "CF04", "name": "Soft-close Doors", "price": 750},
+        {"code": "CF05", "name": "Ambient Lighting, 64 colours", "price": 450},
+        {"code": "CF06", "name": "Heated Steering Wheel", "price": 290},
+        {"code": "CF07", "name": "Massage Seats, front", "desc": "Requires Adaptive Sport Seats.", "price": 1450, "requires": ["SE03"]},
+        {"code": "CF08", "name": "Keyless Entry & Drive", "price": 1100}
+      ]
+    },
+    "car_sound": {
+      "name": "Sound System", "slug": "sound", "section": "technology", "display": "list",
+      "options": [
+        {"code": "AU01", "name": "Kraft Sound, 8 speakers", "price": 0, "default": true},
+        {"code": "AU02", "name": "Premium Surround, 14 speakers, 710 W", "price": 1450},
+        {"code": "AU03", "name": "Reference 3D High-End, 23 speakers, 1,455 W", "price": 6200, "tag": "Popular"}
+      ]
+    },
+    "car_tech": {
+      "name": "Technology & Assistance", "slug": "technology", "section": "technology", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "TE01", "name": "Head-up Display", "price": 1650},
+        {"code": "TE02", "name": "Night Vision Assist", "price": 2700},
+        {"code": "TE03", "name": "Adaptive Cruise Control", "price": 1850, "tag": "Popular"},
+        {"code": "TE04", "name": "Surround View Cameras", "price": 1350},
+        {"code": "TE05", "name": "Lane Keeping Assist", "price": 690},
+        {"code": "TE06", "name": "Park Assist with Remote Parking", "desc": "Requires Surround View Cameras.", "price": 1100, "requires": ["TE04"]},
+        {"code": "TE07", "name": "Digital Rear-view Mirror", "price": 650},
+        {"code": "TE08", "name": "Wireless Charging & Smartphone Integration", "price": 390}
+      ]
+    },
+    "car_performance": {
+      "name": "Performance", "slug": "performance", "section": "performance", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "PF01", "name": "Sport Chrono Package", "desc": "Launch control, drive-mode switch and lap timer.", "price": 2700, "mods": {"accel_0_100_s": -0.2}, "tag": "Popular"},
+        {"code": "PF02", "name": "Sport Exhaust System", "desc": "Switchable valves, black tailpipes.", "price": 3600, "visual": [{"role": "exhaust", "color": "#121314", "finish": "satin"}, {"part": "exhaust", "value": "quad"}]},
+        {"code": "PF03", "name": "Performance Kit +45 hp", "desc": "Larger turbochargers and remapped ECU. Requires Sport Chrono and Sport Exhaust.", "price": 12900, "requires": ["PF01", "PF02"], "mods": {"power_hp": 45, "torque_nm": 50, "accel_0_100_s": -0.2, "top_speed_kmh": 5}},
+        {"code": "PF04", "name": "Ceramic Composite Brakes", "desc": "Includes Acid Yellow calipers.", "price": 9200, "includes": ["BC03"], "mods": {"weight_kg": -16}},
+        {"code": "PF05", "name": "Rear-axle Steering", "price": 2400},
+        {"code": "PF06", "name": "Lightweight Package", "desc": "Bucket seats, lightweight glass and reduced insulation. Not combinable with the glass roof or four-zone climate.", "price": 8800, "includes": ["SE04"], "excludes": ["CF03", "RF02"], "mods": {"weight_kg": -40, "accel_0_100_s": -0.1}, "tag": "Lightweight"},
+        {"code": "PF07", "name": "Front-axle Lift System", "price": 2900},
+        {"code": "PF08", "name": "Aero Kit with Fixed Rear Wing", "desc": "Front lip, side skirts and fixed rear wing.", "price": 6900, "visual": [{"part": "spoiler", "value": "wing"}], "mods": {"top_speed_kmh": -6}},
+        {"code": "PF09", "name": "Sport Suspension, -10 mm", "price": 1400, "visual": [{"part": "ride", "value": "lowered"}]}
+      ]
+    },
+    "car_packages": {
+      "name": "Packages", "slug": "packages", "section": "packages", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "PK01", "name": "Premium Package", "desc": "Seat heating, ambient lighting, soft-close doors and surround view.", "price": 4900, "includes": ["CF01", "CF05", "CF04", "TE04"], "tag": "Popular"},
+        {"code": "PK02", "name": "Driver Assistance Package", "desc": "Adaptive cruise, lane keeping and digital rear-view mirror.", "price": 3600, "includes": ["TE03", "TE05", "TE07"]},
+        {"code": "PK03", "name": "Winter Package", "desc": "Seat heating and heated steering wheel.", "price": 790, "includes": ["CF01", "CF06"]},
+        {"code": "PK04", "name": "Track Package", "desc": "Sport Chrono, aero kit, lowered sport suspension and bucket seats.", "price": 14500, "includes": ["PF01", "PF08", "PF09", "SE04"], "tag": "Motorsport"}
+      ]
+    },
+    "ev_battery": {
+      "name": "Battery", "slug": "battery", "section": "performance", "display": "list",
+      "options": [
+        {"code": "BT01", "name": "Performance Battery, 93 kWh", "price": 0, "default": true},
+        {"code": "BT02", "name": "Performance Battery Plus, 105 kWh", "desc": "Higher peak power and range.", "price": 6500, "mods": {"range_km": 90, "weight_kg": 45, "power_hp": 40}}
+      ]
+    },
+    "ev_charging": {
+      "name": "Charging", "slug": "charging", "section": "performance", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "CH01", "name": "22 kW AC Onboard Charger", "price": 1100},
+        {"code": "CH02", "name": "Heat Pump", "price": 650, "mods": {"range_km": 15}},
+        {"code": "CH03", "name": "Bidirectional Charging", "price": 890},
+        {"code": "CH04", "name": "Home Wallbox 11 kW", "price": 1250}
+      ]
+    },
+    "car_utility": {
+      "name": "Utility & Off-road", "slug": "utility", "section": "comfort", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "UT01", "name": "Electric Towing Hitch", "price": 1190},
+        {"code": "UT02", "name": "Roof Rails & Cross Bars", "price": 690, "visual": [{"part": "roofrack", "value": true}]},
+        {"code": "UT03", "name": "Off-road Package", "desc": "+30 mm air suspension, underbody protection. Not combinable with sport suspension.", "price": 2900, "visual": [{"part": "ride", "value": "lifted"}], "excludes": ["PF09"]},
+        {"code": "UT04", "name": "Third-row Seating", "price": 1800, "mods": {"seats": 2}},
+        {"code": "UT05", "name": "Illuminated Running Boards", "price": 850, "visual": [{"part": "steps", "value": true}]}
+      ]
+    },
+    "pickup_bed": {
+      "name": "Cargo Bed", "slug": "cargo-bed", "section": "comfort", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "BD01", "name": "Spray-in Bed Liner", "price": 590},
+        {"code": "BD02", "name": "Hard Tonneau Cover", "price": 1450, "visual": [{"part": "bedcover", "value": true}]},
+        {"code": "BD03", "name": "Roof LED Light Bar", "price": 790, "visual": [{"part": "lightbar", "value": true}]},
+        {"code": "BD04", "name": "Bed Power Outlet, 2.4 kW", "price": 450}
+      ]
+    },
+
+    "bike_paint": {
+      "name": "Colour", "slug": "colour", "section": "exterior", "display": "swatch", "role": "paint",
+      "options": [
+        {"code": "BK01", "name": "Racing Red", "hex": "#c1121f", "finish": "solid", "price": 0, "default": true},
+        {"code": "BK02", "name": "Midnight Black", "hex": "#0d0e10", "finish": "solid", "price": 0},
+        {"code": "BK03", "name": "Pearl White", "hex": "#ecebe6", "finish": "pearl", "price": 450},
+        {"code": "BK04", "name": "Acid Green", "hex": "#7ac70c", "finish": "solid", "price": 450},
+        {"code": "BK05", "name": "Cobalt Blue Metallic", "hex": "#1f3f9e", "finish": "metallic", "price": 650},
+        {"code": "BK06", "name": "Matte Graphite", "hex": "#3a3c40", "finish": "matte", "price": 650},
+        {"code": "BK07", "name": "Heritage Silver / Blue Livery", "hex": "#c3c7cc", "finish": "metallic", "price": 1200, "visual": [{"role": "paint", "color": "#c3c7cc", "finish": "metallic"}, {"role": "accent", "color": "#1f3f9e"}], "tag": "Special"}
+      ]
+    },
+    "bike_frame": {
+      "name": "Frame", "slug": "frame", "section": "exterior", "display": "swatch", "role": "frame",
+      "options": [
+        {"code": "FR01", "name": "Black", "hex": "#141516", "price": 0, "default": true},
+        {"code": "FR02", "name": "Racing Red", "hex": "#b5121b", "price": 250},
+        {"code": "FR03", "name": "Titanium", "hex": "#8d8f92", "finish": "metallic", "price": 250},
+        {"code": "FR04", "name": "Gold", "hex": "#b8902c", "finish": "metallic", "price": 350}
+      ]
+    },
+    "bike_wheels": {
+      "name": "Wheels", "slug": "wheels", "section": "wheels", "display": "tile",
+      "options": [
+        {"code": "BW01", "name": "Cast Aluminium, 5-spoke Black", "price": 0, "default": true, "visual": [{"role": "rims", "color": "#141516", "finish": "satin"}, {"part": "wheel", "value": {"spokes": 5, "style": "cast"}}]},
+        {"code": "BW02", "name": "Cast Aluminium, Gold", "price": 390, "visual": [{"role": "rims", "color": "#b8902c", "finish": "metallic"}, {"part": "wheel", "value": {"spokes": 5, "style": "cast"}}]},
+        {"code": "BW03", "name": "Forged Aluminium, 7-spoke", "price": 1850, "visual": [{"role": "rims", "color": "#2b2c2e", "finish": "metallic"}, {"part": "wheel", "value": {"spokes": 7, "style": "forged"}}], "mods": {"weight_kg": -2.1}},
+        {"code": "BW04", "name": "Carbon Fibre", "price": 4900, "visual": [{"role": "rims", "color": "#1b1c1f", "finish": "carbon"}, {"part": "wheel", "value": {"spokes": 5, "style": "carbon"}}], "mods": {"weight_kg": -3.2}, "tag": "Lightweight"},
+        {"code": "BW05", "name": "Wire-spoke Tubeless", "price": 950, "visual": [{"role": "rims", "color": "#c9ccd1", "finish": "chrome"}, {"part": "wheel", "value": {"spokes": 36, "style": "wire"}}]}
+      ]
+    },
+    "bike_seat": {
+      "name": "Seat", "slug": "seat", "section": "interior", "display": "list",
+      "options": [
+        {"code": "ST01", "name": "Standard Seat", "price": 0, "default": true, "visual": [{"role": "seat", "color": "#151517"}]},
+        {"code": "ST02", "name": "Comfort Gel Seat", "price": 350, "visual": [{"role": "seat", "color": "#1d1e20"}]},
+        {"code": "ST03", "name": "Low Seat, -30 mm", "price": 250, "visual": [{"role": "seat", "color": "#151517"}], "mods": {"seat_height_mm": -30}},
+        {"code": "ST04", "name": "Alcantara Sport Seat, red stitching", "price": 420, "visual": [{"role": "seat", "color": "#3a1416", "finish": "suede"}]},
+        {"code": "ST05", "name": "Heated Rider & Passenger Seat", "price": 650, "visual": [{"role": "seat", "color": "#151517"}]}
+      ]
+    },
+    "bike_performance": {
+      "name": "Performance", "slug": "performance", "section": "performance", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "BP01", "name": "Titanium Full Exhaust System", "price": 3200, "visual": [{"role": "exhaust", "color": "#8a8478", "finish": "titanium"}], "mods": {"power_hp": 8, "weight_kg": -4.5}, "tag": "Popular"},
+        {"code": "BP02", "name": "Race ECU Map", "desc": "Requires the titanium exhaust.", "price": 450, "requires": ["BP01"], "mods": {"power_hp": 5}},
+        {"code": "BP03", "name": "Quickshifter Up/Down", "price": 590},
+        {"code": "BP04", "name": "Semi-active Suspension", "price": 1900},
+        {"code": "BP05", "name": "Steering Damper", "price": 380},
+        {"code": "BP06", "name": "Launch & Wheelie Control", "price": 290, "mods": {"accel_0_100_s": -0.1}}
+      ]
+    },
+    "bike_tech": {
+      "name": "Technology", "slug": "technology", "section": "technology", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "BX01", "name": "TFT Navigation", "price": 450},
+        {"code": "BX02", "name": "Cornering ABS Pro", "price": 690, "tag": "Popular"},
+        {"code": "BX03", "name": "Cruise Control", "price": 390},
+        {"code": "BX04", "name": "Heated Grips", "price": 290},
+        {"code": "BX05", "name": "Tyre Pressure Monitoring", "price": 220},
+        {"code": "BX06", "name": "Keyless Ignition", "price": 250},
+        {"code": "BX07", "name": "Front & Rear Dashcam", "price": 590}
+      ]
+    },
+    "bike_packages": {
+      "name": "Packages", "slug": "packages", "section": "packages", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "BG01", "name": "Touring Pack", "desc": "Aluminium panniers and top case.", "price": 1450, "visual": [{"part": "luggage", "value": true}], "mods": {"weight_kg": 9}},
+        {"code": "BG02", "name": "Comfort Pack", "desc": "Cruise control, heated grips and gel seat.", "price": 990, "includes": ["BX03", "BX04", "ST02"]},
+        {"code": "BG03", "name": "Track Pack", "desc": "Quickshifter, steering damper and Cornering ABS Pro.", "price": 1400, "includes": ["BP03", "BP05", "BX02"], "tag": "Motorsport"},
+        {"code": "BG04", "name": "Tall Touring Screen", "price": 240, "visual": [{"part": "screen", "value": "tall"}]}
+      ]
+    },
+
+    "boat_hull": {
+      "name": "Hull Colour", "slug": "hull-colour", "section": "exterior", "display": "swatch", "role": "hull",
+      "options": [
+        {"code": "HL01", "name": "Arctic White Gelcoat", "hex": "#f1f2f0", "finish": "gloss", "price": 0, "default": true},
+        {"code": "HL02", "name": "Abyss Blue Metallic", "hex": "#16294d", "finish": "metallic", "price": 9500},
+        {"code": "HL03", "name": "Titanium Grey Metallic", "hex": "#5b6168", "finish": "metallic", "price": 9500},
+        {"code": "HL04", "name": "Signal Red", "hex": "#a8141c", "finish": "gloss", "price": 7800},
+        {"code": "HL05", "name": "Sand Beige", "hex": "#cbbd9f", "finish": "gloss", "price": 6500},
+        {"code": "HL06", "name": "Gloss Black", "hex": "#0b0c0e", "finish": "gloss", "price": 11000, "tag": "Exclusive"}
+      ]
+    },
+    "boat_stripe": {
+      "name": "Hull Accent Line", "slug": "hull-accent", "section": "exterior", "display": "swatch", "role": "hull_accent",
+      "options": [
+        {"code": "HS01", "name": "Silver Line", "hex": "#c4c8cc", "finish": "metallic", "price": 0, "default": true},
+        {"code": "HS02", "name": "Black Line", "hex": "#101112", "price": 0},
+        {"code": "HS03", "name": "Red Line", "hex": "#b3121b", "price": 1200},
+        {"code": "HS04", "name": "Gold Leaf Line", "hex": "#c19a3a", "finish": "metallic", "price": 2400}
+      ]
+    },
+    "boat_deck": {
+      "name": "Deck", "slug": "deck", "section": "exterior", "display": "swatch", "role": "deck",
+      "options": [
+        {"code": "DK01", "name": "Natural Teak", "hex": "#a8743f", "finish": "satin", "price": 0, "default": true},
+        {"code": "DK02", "name": "Synthetic Teak, Grey", "hex": "#8a8c8a", "finish": "satin", "price": 4800},
+        {"code": "DK03", "name": "CoolDeck White", "hex": "#e4e2dc", "finish": "satin", "price": 3200},
+        {"code": "DK04", "name": "EVA Foam, Graphite", "hex": "#43464b", "finish": "satin", "price": 2600}
+      ]
+    },
+    "boat_upholstery": {
+      "name": "Upholstery", "slug": "upholstery", "section": "interior", "display": "swatch", "role": "upholstery",
+      "options": [
+        {"code": "UP01", "name": "Ivory Marine Vinyl", "hex": "#e9e4d8", "price": 0, "default": true},
+        {"code": "UP02", "name": "Sand Marine Vinyl", "hex": "#cbb994", "price": 0},
+        {"code": "UP03", "name": "Graphite Marine Vinyl", "hex": "#3b3e42", "price": 2800},
+        {"code": "UP04", "name": "Navy Blue Marine Vinyl", "hex": "#1d2b4a", "price": 3600},
+        {"code": "UP05", "name": "Cognac Marine Leather", "hex": "#8a4a24", "price": 7900, "tag": "Exclusive"}
+      ]
+    },
+    "boat_top": {
+      "name": "Top & Shade", "slug": "top", "section": "exterior", "display": "list",
+      "options": [
+        {"code": "TP01", "name": "Open Cockpit", "price": 0, "default": true, "visual": [{"part": "top", "value": "none"}]},
+        {"code": "TP02", "name": "Bimini Top, Navy Canvas", "price": 3900, "visual": [{"part": "top", "value": "bimini"}, {"role": "canopy", "color": "#1d2b4a"}]},
+        {"code": "TP03", "name": "Fibreglass T-Top", "price": 14500, "visual": [{"part": "top", "value": "ttop"}], "mods": {"weight_kg": 180}},
+        {"code": "TP04", "name": "Hardtop with Electric Sunroof", "price": 28000, "visual": [{"part": "top", "value": "hardtop"}], "mods": {"weight_kg": 320}}
+      ]
+    },
+    "boat_electronics": {
+      "name": "Navigation & Electronics", "slug": "electronics", "section": "technology", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "NE01", "name": "Dual 16\" Glass Helm Chartplotters", "price": 6900, "tag": "Popular"},
+        {"code": "NE02", "name": "Solid-state Radar, 4 kW", "price": 4500},
+        {"code": "NE03", "name": "Autopilot", "price": 5200},
+        {"code": "NE04", "name": "CHIRP Sonar & Fishfinder", "price": 2400},
+        {"code": "NE05", "name": "Joystick Docking", "price": 12500},
+        {"code": "NE06", "name": "Underwater LED Lighting", "price": 3400, "visual": [{"role": "underlight", "color": "#2ad1ff"}]},
+        {"code": "NE07", "name": "Premium Marine Audio", "price": 3900},
+        {"code": "NE08", "name": "Remote Monitoring & GPS Tracking", "price": 1200}
+      ]
+    },
+    "boat_comfort": {
+      "name": "Comfort", "slug": "comfort", "section": "comfort", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "MC01", "name": "Bow Sunpad with Backrest", "price": 2200},
+        {"code": "MC02", "name": "Wet Bar with Refrigerator", "price": 4800},
+        {"code": "MC03", "name": "Diesel Generator", "price": 9500, "mods": {"weight_kg": 140}},
+        {"code": "MC04", "name": "Air Conditioning", "desc": "Requires the diesel generator.", "price": 7800, "requires": ["MC03"]},
+        {"code": "MC05", "name": "Bow Thruster", "price": 6900},
+        {"code": "MC06", "name": "Swim Platform Extension", "price": 5400},
+        {"code": "MC07", "name": "Freshwater Transom Shower", "price": 950}
+      ]
+    },
+    "boat_packages": {
+      "name": "Packages", "slug": "packages", "section": "packages", "display": "list", "selection": "multi",
+      "options": [
+        {"code": "MP01", "name": "Watersports Package", "desc": "Wakeboard tower, ski pylon and premium audio.", "price": 9900, "includes": ["NE07"], "visual": [{"part": "tower", "value": true}]},
+        {"code": "MP02", "name": "Fishing Package", "desc": "Rod holders, livewell, outriggers and sonar.", "price": 6500, "includes": ["NE04"]},
+        {"code": "MP03", "name": "Comfort Cruising Package", "desc": "Bow sunpad, wet bar and transom shower.", "price": 15500, "includes": ["MC01", "MC02", "MC07"], "tag": "Popular"},
+        {"code": "MP04", "name": "Navigation Pro Package", "desc": "Glass helm, radar and autopilot.", "price": 13900, "includes": ["NE01", "NE02", "NE03"]}
+      ]
+    }
+  },
+
+  "upload_templates": {
+    "car": {
+      "templates": ["car_paint", "car_exterior_details", "car_wheels", "car_calipers", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_performance", "car_packages"],
+      "variants": [{"code": "STD", "name": "Standard", "factor": 1.0}, {"code": "PRF", "name": "Performance", "factor": 1.18}]
+    },
+    "bike": {
+      "templates": ["bike_paint", "bike_frame", "bike_wheels", "bike_seat", "bike_performance", "bike_tech", "bike_packages"],
+      "variants": [{"code": "STD", "name": "Standard", "factor": 1.0}]
+    },
+    "boat": {
+      "templates": ["boat_hull", "boat_stripe", "boat_deck", "boat_upholstery", "boat_top", "boat_electronics", "boat_comfort", "boat_packages"],
+      "variants": [{"code": "STD", "name": "Standard", "factor": 1.0}]
+    }
+  },
+
+  "vehicles": [
+    {
+      "name": "Kraft 9R", "slug": "kraft-9r", "type": "car", "class": "coupe", "family": "9R", "year": 2027,
+      "tagline": "The rear-engined sports coupé, refined over six decades.",
+      "description": "A flat-six behind the rear axle, a driver-focused cockpit and a chassis tuned on the Nordschleife. Four variants from the pure 9R to the all-wheel-drive 9R Turbo.",
+      "shape": {"kind": "car", "body": "coupe"},
+      "templates": ["car_paint", "car_exterior_details", "car_roof", "car_wheels", "car_calipers", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_performance", "car_packages"],
+      "availability": {"PK04": ["GTS", "TRB"], "PX03": ["TRB"]},
+      "variants": [
+        {"code": "BASE", "name": "9R", "price": 118500, "default": true, "specs": {"power_hp": 394, "torque_nm": 450, "accel_0_100_s": 4.1, "top_speed_kmh": 294, "weight_kg": 1505, "drive": "RWD", "consumption_l_100km": 10.1}},
+        {"code": "S", "name": "9R S", "price": 136800, "specs": {"power_hp": 473, "torque_nm": 530, "accel_0_100_s": 3.5, "top_speed_kmh": 308, "weight_kg": 1515, "drive": "RWD", "consumption_l_100km": 10.6}},
+        {"code": "GTS", "name": "9R GTS", "price": 158400, "specs": {"power_hp": 532, "torque_nm": 610, "accel_0_100_s": 3.3, "top_speed_kmh": 312, "weight_kg": 1530, "drive": "RWD", "consumption_l_100km": 11.0}},
+        {"code": "TRB", "name": "9R Turbo", "price": 241300, "specs": {"power_hp": 650, "torque_nm": 800, "accel_0_100_s": 2.7, "top_speed_kmh": 330, "weight_kg": 1640, "drive": "AWD", "consumption_l_100km": 12.0}}
+      ]
+    },
+    {
+      "name": "Kraft 9R Cabriolet", "slug": "kraft-9r-cabriolet", "type": "car", "class": "convertible", "family": "9R", "year": 2027,
+      "tagline": "Open-air performance with a 12-second fabric roof.",
+      "description": "Everything the 9R coupé does, with a lightweight fabric roof that opens in 12 seconds at up to 50 km/h.",
+      "shape": {"kind": "car", "body": "cabriolet"},
+      "templates": ["car_paint", "car_exterior_details", "car_wheels", "car_calipers", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_performance", "car_packages"],
+      "drop": ["PK04", "PF06"],
+      "categories": [
+        {"name": "Convertible Top", "slug": "soft-top", "section": "exterior", "display": "swatch", "role": "softtop", "order": 2,
+         "options": [
+           {"code": "SFT1", "name": "Black Fabric", "hex": "#141516", "price": 0, "default": true},
+           {"code": "SFT2", "name": "Dark Blue Fabric", "hex": "#1d2b4a", "price": 0},
+           {"code": "SFT3", "name": "Bordeaux Fabric", "hex": "#4a1420", "price": 690},
+           {"code": "SFT4", "name": "Graphite Fabric", "hex": "#3b3e42", "price": 0}
+         ]},
+        {"name": "Top Position", "slug": "top-position", "section": "exterior", "display": "list", "order": 3,
+         "options": [
+           {"code": "TOP1", "name": "Roof Closed (preview)", "price": 0, "default": true, "visual": [{"part": "top", "value": "closed"}]},
+           {"code": "TOP2", "name": "Roof Open (preview)", "price": 0, "visual": [{"part": "top", "value": "open"}]}
+         ]}
+      ],
+      "variants": [
+        {"code": "BASE", "name": "9R Cabriolet", "price": 131000, "default": true, "specs": {"power_hp": 394, "torque_nm": 450, "accel_0_100_s": 4.3, "top_speed_kmh": 292, "weight_kg": 1575, "drive": "RWD", "consumption_l_100km": 10.4}},
+        {"code": "S", "name": "9R S Cabriolet", "price": 149900, "specs": {"power_hp": 473, "torque_nm": 530, "accel_0_100_s": 3.7, "top_speed_kmh": 306, "weight_kg": 1585, "drive": "RWD", "consumption_l_100km": 10.8}},
+        {"code": "GTS", "name": "9R GTS Cabriolet", "price": 171400, "specs": {"power_hp": 532, "torque_nm": 610, "accel_0_100_s": 3.5, "top_speed_kmh": 310, "weight_kg": 1600, "drive": "RWD", "consumption_l_100km": 11.2}}
+      ]
+    },
+    {
+      "name": "Apex V12", "slug": "apex-v12", "type": "car", "class": "supercar", "family": "Apex", "year": 2027,
+      "tagline": "Naturally aspirated V12, carbon monocoque, 9,500 rpm.",
+      "description": "A mid-engined hypercar built around a carbon tub, active aerodynamics and a hybrid-free 6.5-litre V12.",
+      "shape": {"kind": "car", "body": "supercar"},
+      "price_scale": 1.6,
+      "templates": ["car_paint", "car_exterior_details", "car_wheels", "car_calipers", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_performance", "car_packages"],
+      "drop": ["PF07", "UT01", "PK03", "PF03"],
+      "variants": [
+        {"code": "APX", "name": "Apex V12", "price": 412000, "default": true, "specs": {"power_hp": 819, "torque_nm": 725, "accel_0_100_s": 2.8, "top_speed_kmh": 340, "weight_kg": 1690, "drive": "AWD", "consumption_l_100km": 17.4}},
+        {"code": "SV", "name": "Apex V12 SV", "price": 489000, "specs": {"power_hp": 860, "torque_nm": 740, "accel_0_100_s": 2.5, "top_speed_kmh": 350, "weight_kg": 1550, "drive": "AWD", "consumption_l_100km": 18.1}}
+      ]
+    },
+    {
+      "name": "Strata", "slug": "strata", "type": "car", "class": "sedan", "family": "Strata", "year": 2027,
+      "tagline": "The four-door sports saloon for long distances, fast.",
+      "description": "Grand-touring comfort for four, a twin-turbo V6 or V8 and adaptive air suspension as standard.",
+      "shape": {"kind": "car", "body": "sedan"},
+      "templates": ["car_paint", "car_exterior_details", "car_roof", "car_wheels", "car_calipers", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_performance", "car_packages"],
+      "drop": ["PK04", "PF08"],
+      "variants": [
+        {"code": "4", "name": "Strata 4", "price": 98900, "default": true, "specs": {"power_hp": 348, "torque_nm": 500, "accel_0_100_s": 5.1, "top_speed_kmh": 270, "weight_kg": 2050, "drive": "AWD", "consumption_l_100km": 10.3, "seats": 4}},
+        {"code": "4S", "name": "Strata 4S", "price": 121600, "specs": {"power_hp": 443, "torque_nm": 550, "accel_0_100_s": 4.4, "top_speed_kmh": 289, "weight_kg": 2080, "drive": "AWD", "consumption_l_100km": 10.6, "seats": 4}},
+        {"code": "GTS", "name": "Strata GTS", "price": 148300, "specs": {"power_hp": 473, "torque_nm": 620, "accel_0_100_s": 3.9, "top_speed_kmh": 300, "weight_kg": 2100, "drive": "AWD", "consumption_l_100km": 11.5, "seats": 4}}
+      ]
+    },
+    {
+      "name": "Volta E", "slug": "volta-e", "type": "car", "class": "electric", "family": "Volta", "year": 2027,
+      "tagline": "All-electric sports saloon with 800-volt architecture.",
+      "description": "Two-speed rear transmission, 320 kW peak DC charging and repeatable launch performance from an 800 V battery.",
+      "shape": {"kind": "car", "body": "sedan", "electric": true, "length": 4.96, "height": 1.38},
+      "templates": ["car_paint", "car_exterior_details", "car_roof", "car_wheels", "car_calipers", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "ev_battery", "ev_charging", "car_performance", "car_packages"],
+      "drop": ["PF02", "PF03", "PK04", "PF08"],
+      "variants": [
+        {"code": "E", "name": "Volta E", "price": 106000, "default": true, "specs": {"power_hp": 402, "torque_nm": 410, "accel_0_100_s": 4.8, "top_speed_kmh": 230, "weight_kg": 2195, "drive": "RWD", "range_km": 590, "seats": 4}},
+        {"code": "4S", "name": "Volta 4S", "price": 128500, "specs": {"power_hp": 590, "torque_nm": 710, "accel_0_100_s": 4.0, "top_speed_kmh": 250, "weight_kg": 2220, "drive": "AWD", "range_km": 560, "seats": 4}},
+        {"code": "TGT", "name": "Volta Turbo GT", "price": 231000, "specs": {"power_hp": 1093, "torque_nm": 1340, "accel_0_100_s": 2.2, "top_speed_kmh": 305, "weight_kg": 2320, "drive": "AWD", "range_km": 480, "seats": 4}}
+      ]
+    },
+    {
+      "name": "Terra", "slug": "terra", "type": "car", "class": "suv", "family": "Terra", "year": 2027,
+      "tagline": "The sports car among SUVs.",
+      "description": "Five seats, 770 litres of luggage space, adaptive air suspension and the handling of a sports car.",
+      "shape": {"kind": "car", "body": "suv"},
+      "templates": ["car_paint", "car_exterior_details", "car_roof", "car_wheels", "car_calipers", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_performance", "car_utility", "car_packages"],
+      "drop": ["PK04", "PF08", "WH06", "TY03"],
+      "variants": [
+        {"code": "BASE", "name": "Terra", "price": 89400, "default": true, "specs": {"power_hp": 348, "torque_nm": 500, "accel_0_100_s": 5.7, "top_speed_kmh": 248, "weight_kg": 2055, "drive": "AWD", "consumption_l_100km": 11.4, "seats": 5}},
+        {"code": "S", "name": "Terra S", "price": 104900, "specs": {"power_hp": 468, "torque_nm": 600, "accel_0_100_s": 4.9, "top_speed_kmh": 273, "weight_kg": 2085, "drive": "AWD", "consumption_l_100km": 12.1, "seats": 5}},
+        {"code": "EH", "name": "Terra E-Hybrid", "price": 112300, "specs": {"power_hp": 463, "torque_nm": 650, "accel_0_100_s": 4.9, "top_speed_kmh": 254, "weight_kg": 2380, "drive": "AWD", "range_km": 90, "consumption_l_100km": 2.4, "seats": 5}}
+      ]
+    },
+    {
+      "name": "Pulse", "slug": "pulse", "type": "car", "class": "hatchback", "family": "Pulse", "year": 2027,
+      "tagline": "Compact, agile and surprisingly quick.",
+      "description": "A five-door hot hatch with a turbocharged four-cylinder, torque-vectoring front axle and a practical boot.",
+      "shape": {"kind": "car", "body": "hatchback"},
+      "price_scale": 0.6,
+      "templates": ["car_paint", "car_exterior_details", "car_roof", "car_wheels", "car_calipers", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_performance", "car_packages"],
+      "drop": ["PK04", "WH06", "PX03", "PF04", "PF07", "AU03", "TE02"],
+      "variants": [
+        {"code": "BASE", "name": "Pulse", "price": 38900, "default": true, "specs": {"power_hp": 180, "torque_nm": 300, "accel_0_100_s": 7.4, "top_speed_kmh": 220, "weight_kg": 1350, "drive": "FWD", "consumption_l_100km": 6.4, "seats": 5}},
+        {"code": "R", "name": "Pulse R", "price": 49900, "specs": {"power_hp": 320, "torque_nm": 420, "accel_0_100_s": 4.8, "top_speed_kmh": 250, "weight_kg": 1480, "drive": "AWD", "consumption_l_100km": 8.2, "seats": 5}}
+      ]
+    },
+    {
+      "name": "Strata Touring", "slug": "strata-touring", "type": "car", "class": "wagon", "family": "Strata", "year": 2027,
+      "tagline": "Shooting brake practicality, sports car pace.",
+      "description": "The Strata with a longer roofline, 1,390 litres of cargo space and a 4+1 seating layout.",
+      "shape": {"kind": "car", "body": "wagon"},
+      "templates": ["car_paint", "car_exterior_details", "car_roof", "car_wheels", "car_calipers", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_performance", "car_utility", "car_packages"],
+      "drop": ["PK04", "PF08", "UT03", "UT04", "UT05"],
+      "variants": [
+        {"code": "4", "name": "Strata 4 Touring", "price": 104500, "default": true, "specs": {"power_hp": 348, "torque_nm": 500, "accel_0_100_s": 5.2, "top_speed_kmh": 268, "weight_kg": 2110, "drive": "AWD", "consumption_l_100km": 10.6, "seats": 5}},
+        {"code": "TS", "name": "Strata Turbo S Touring", "price": 213000, "specs": {"power_hp": 680, "torque_nm": 870, "accel_0_100_s": 3.3, "top_speed_kmh": 310, "weight_kg": 2195, "drive": "AWD", "consumption_l_100km": 12.4, "seats": 5}}
+      ]
+    },
+    {
+      "name": "Ridge", "slug": "ridge", "type": "car", "class": "pickup", "family": "Ridge", "year": 2027,
+      "tagline": "Full-size pickup with a 4.5-tonne towing capacity.",
+      "description": "Body-on-frame toughness, a twin-turbo V6 and a 1.8 m composite bed with integrated power.",
+      "shape": {"kind": "car", "body": "pickup"},
+      "price_scale": 0.7,
+      "templates": ["car_paint", "car_exterior_details", "car_wheels", "car_calipers", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_utility", "pickup_bed", "car_packages"],
+      "drop": ["PK04", "WH06", "TY03", "PX03", "SE04", "EX05"],
+      "variants": [
+        {"code": "BASE", "name": "Ridge", "price": 54900, "default": true, "specs": {"power_hp": 400, "torque_nm": 680, "accel_0_100_s": 6.1, "top_speed_kmh": 180, "weight_kg": 2450, "drive": "4WD", "consumption_l_100km": 13.1, "seats": 5, "towing_kg": 4500}},
+        {"code": "TRL", "name": "Ridge Trail", "price": 72400, "specs": {"power_hp": 450, "torque_nm": 690, "accel_0_100_s": 5.8, "top_speed_kmh": 180, "weight_kg": 2600, "drive": "4WD", "consumption_l_100km": 14.2, "seats": 5, "towing_kg": 3600}}
+      ]
+    },
+    {
+      "name": "Haven", "slug": "haven", "type": "car", "class": "van", "family": "Haven", "year": 2027,
+      "tagline": "Seven seats, sliding doors, zero compromise.",
+      "description": "A premium people mover with lounge seating, twin sliding doors and an efficient hybrid drivetrain.",
+      "shape": {"kind": "car", "body": "van"},
+      "price_scale": 0.6,
+      "templates": ["car_paint", "car_exterior_details", "car_roof", "car_wheels", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_utility", "car_packages"],
+      "drop": ["PK04", "WH06", "WH04", "TY03", "PX03", "SE04", "EX05", "UT03", "UT04"],
+      "variants": [
+        {"code": "BASE", "name": "Haven", "price": 46900, "default": true, "specs": {"power_hp": 245, "torque_nm": 350, "accel_0_100_s": 8.9, "top_speed_kmh": 190, "weight_kg": 2100, "drive": "FWD", "consumption_l_100km": 7.8, "seats": 7}},
+        {"code": "HYB", "name": "Haven Hybrid", "price": 52900, "specs": {"power_hp": 250, "torque_nm": 420, "accel_0_100_s": 8.4, "top_speed_kmh": 180, "weight_kg": 2190, "drive": "AWD", "consumption_l_100km": 5.6, "seats": 7}}
+      ]
+    },
+    {
+      "name": "Atlas", "slug": "atlas", "type": "car", "class": "offroad", "family": "Atlas", "year": 2027,
+      "tagline": "Three locking differentials and a ladder frame.",
+      "description": "A boxy, uncompromising off-roader with 900 mm wading depth, low-range transfer case and full skid plates.",
+      "shape": {"kind": "car", "body": "offroad"},
+      "price_scale": 0.8,
+      "templates": ["car_paint", "car_exterior_details", "car_wheels", "car_tyres", "car_interior_colour", "car_seats", "car_trim", "car_comfort", "car_sound", "car_tech", "car_utility", "car_packages"],
+      "drop": ["PK04", "WH06", "WH05", "TY03", "PX03", "SE04", "EX05", "UT05"],
+      "variants": [
+        {"code": "BASE", "name": "Atlas", "price": 74900, "default": true, "specs": {"power_hp": 362, "torque_nm": 500, "accel_0_100_s": 6.2, "top_speed_kmh": 190, "weight_kg": 2350, "drive": "4WD", "consumption_l_100km": 12.6, "seats": 5}},
+        {"code": "EXP", "name": "Atlas Expedition", "price": 92400, "specs": {"power_hp": 420, "torque_nm": 560, "accel_0_100_s": 5.9, "top_speed_kmh": 190, "weight_kg": 2480, "drive": "4WD", "consumption_l_100km": 13.4, "seats": 5}}
+      ]
+    },
+
+    {
+      "name": "RS 1000", "slug": "rs-1000", "type": "bike", "class": "sport", "family": "RS", "year": 2027,
+      "tagline": "MotoGP-derived superbike with winglets.",
+      "description": "A 999 cc inline-four, aluminium twin-spar frame, aerodynamic winglets and a six-axis IMU running every assist.",
+      "shape": {"kind": "bike", "body": "sport"},
+      "templates": ["bike_paint", "bike_frame", "bike_wheels", "bike_seat", "bike_performance", "bike_tech", "bike_packages"],
+      "drop": ["BW05", "BG01", "BG04", "ST05"],
+      "variants": [
+        {"code": "BASE", "name": "RS 1000", "price": 22900, "default": true, "specs": {"power_hp": 207, "torque_nm": 113, "accel_0_100_s": 3.0, "top_speed_kmh": 299, "weight_kg": 199, "displacement_cc": 999, "seat_height_mm": 832}},
+        {"code": "R", "name": "RS 1000 R", "price": 31500, "specs": {"power_hp": 217, "torque_nm": 117, "accel_0_100_s": 2.9, "top_speed_kmh": 305, "weight_kg": 193, "displacement_cc": 999, "seat_height_mm": 835}}
+      ]
+    },
+    {
+      "name": "Nyx", "slug": "nyx", "type": "bike", "class": "naked", "family": "Nyx", "year": 2027,
+      "tagline": "Hyper-naked streetfighter, V4 power.",
+      "description": "The superbike engine in an upright, aggressive street package with wide bars and minimal bodywork.",
+      "shape": {"kind": "bike", "body": "naked"},
+      "templates": ["bike_paint", "bike_frame", "bike_wheels", "bike_seat", "bike_performance", "bike_tech", "bike_packages"],
+      "drop": ["BW05", "BG01", "BG04"],
+      "variants": [
+        {"code": "BASE", "name": "Nyx", "price": 17800, "default": true, "specs": {"power_hp": 165, "torque_nm": 112, "accel_0_100_s": 3.2, "top_speed_kmh": 260, "weight_kg": 201, "displacement_cc": 998, "seat_height_mm": 845}},
+        {"code": "RS", "name": "Nyx RS", "price": 23400, "specs": {"power_hp": 208, "torque_nm": 123, "accel_0_100_s": 3.0, "top_speed_kmh": 285, "weight_kg": 199, "displacement_cc": 1103, "seat_height_mm": 845}}
+      ]
+    },
+    {
+      "name": "Drift", "slug": "drift", "type": "bike", "class": "cruiser", "family": "Drift", "year": 2027,
+      "tagline": "Big-twin cruiser, low and long.",
+      "description": "A 1,868 cc V-twin, forward controls and a 680 mm seat for relaxed miles on the open road.",
+      "shape": {"kind": "bike", "body": "cruiser"},
+      "templates": ["bike_paint", "bike_frame", "bike_wheels", "bike_seat", "bike_performance", "bike_tech", "bike_packages"],
+      "drop": ["BW04", "BG03", "BP06", "BP05"],
+      "variants": [
+        {"code": "BASE", "name": "Drift", "price": 19900, "default": true, "specs": {"power_hp": 92, "torque_nm": 155, "accel_0_100_s": 4.3, "top_speed_kmh": 180, "weight_kg": 297, "displacement_cc": 1868, "seat_height_mm": 680}},
+        {"code": "SPC", "name": "Drift Special", "price": 24600, "specs": {"power_hp": 101, "torque_nm": 163, "accel_0_100_s": 4.1, "top_speed_kmh": 185, "weight_kg": 304, "displacement_cc": 1923, "seat_height_mm": 690}}
+      ]
+    },
+    {
+      "name": "Meridian", "slug": "meridian", "type": "bike", "class": "touring", "family": "Meridian", "year": 2027,
+      "tagline": "Continent-crossing comfort with a full fairing.",
+      "description": "Electrically adjustable screen, heated seats, 33-litre fuel tank and semi-active suspension for two-up touring.",
+      "shape": {"kind": "bike", "body": "touring"},
+      "templates": ["bike_paint", "bike_frame", "bike_wheels", "bike_seat", "bike_performance", "bike_tech", "bike_packages"],
+      "drop": ["BW04", "BG03", "BP06", "BP02"],
+      "variants": [
+        {"code": "BASE", "name": "Meridian", "price": 28900, "default": true, "specs": {"power_hp": 136, "torque_nm": 143, "accel_0_100_s": 3.9, "top_speed_kmh": 220, "weight_kg": 381, "displacement_cc": 1254, "seat_height_mm": 760}},
+        {"code": "GT", "name": "Meridian GT", "price": 34500, "specs": {"power_hp": 136, "torque_nm": 143, "accel_0_100_s": 4.0, "top_speed_kmh": 220, "weight_kg": 394, "displacement_cc": 1254, "seat_height_mm": 760}}
+      ]
+    },
+    {
+      "name": "Trail X", "slug": "trail-x", "type": "bike", "class": "adventure", "family": "Trail", "year": 2027,
+      "tagline": "Adventure-ready on and off the tarmac.",
+      "description": "Long-travel suspension, 21-inch front wheel, crash bars and an off-road ABS mode for gravel and beyond.",
+      "shape": {"kind": "bike", "body": "adventure"},
+      "templates": ["bike_paint", "bike_frame", "bike_wheels", "bike_seat", "bike_performance", "bike_tech", "bike_packages"],
+      "drop": ["BW04"],
+      "variants": [
+        {"code": "BASE", "name": "Trail X", "price": 19500, "default": true, "specs": {"power_hp": 136, "torque_nm": 143, "accel_0_100_s": 3.6, "top_speed_kmh": 230, "weight_kg": 249, "displacement_cc": 1254, "seat_height_mm": 850}},
+        {"code": "RLY", "name": "Trail X Rally", "price": 23900, "specs": {"power_hp": 136, "torque_nm": 143, "accel_0_100_s": 3.7, "top_speed_kmh": 225, "weight_kg": 244, "displacement_cc": 1254, "seat_height_mm": 890}}
+      ]
+    },
+    {
+      "name": "MX 450", "slug": "mx-450", "type": "bike", "class": "motocross", "family": "MX", "year": 2027,
+      "tagline": "Factory-spec motocross racer.",
+      "description": "A 450 cc single-cylinder four-stroke, chromoly frame and fully adjustable suspension, straight from the race team.",
+      "shape": {"kind": "bike", "body": "motocross"},
+      "templates": ["bike_paint", "bike_frame", "bike_wheels", "bike_seat", "bike_performance"],
+      "drop": ["BW03", "BW04", "BW01", "BW02", "ST05", "ST02", "BP04", "BP06"],
+      "availability": {},
+      "variants": [
+        {"code": "BASE", "name": "MX 450", "price": 10400, "default": true, "specs": {"power_hp": 63, "torque_nm": 50, "top_speed_kmh": 150, "weight_kg": 104, "displacement_cc": 450, "seat_height_mm": 960}},
+        {"code": "FAC", "name": "MX 450 Factory Edition", "price": 12900, "specs": {"power_hp": 64, "torque_nm": 51, "top_speed_kmh": 152, "weight_kg": 102, "displacement_cc": 450, "seat_height_mm": 960}}
+      ]
+    },
+    {
+      "name": "Metro", "slug": "metro", "type": "bike", "class": "scooter", "family": "Metro", "year": 2027,
+      "tagline": "Premium urban scooter with under-seat storage.",
+      "description": "Step-through convenience, two helmets of storage, keyless start and a connected TFT dash.",
+      "shape": {"kind": "bike", "body": "scooter"},
+      "price_scale": 0.4,
+      "templates": ["bike_paint", "bike_wheels", "bike_seat", "bike_tech", "bike_packages"],
+      "drop": ["BW03", "BW04", "BW05", "BG03", "BX02"],
+      "variants": [
+        {"code": "125", "name": "Metro 125", "price": 4600, "default": true, "specs": {"power_hp": 15, "torque_nm": 12, "accel_0_100_s": 0, "top_speed_kmh": 110, "weight_kg": 135, "displacement_cc": 125, "seat_height_mm": 790}},
+        {"code": "300", "name": "Metro 300", "price": 6400, "specs": {"power_hp": 28, "torque_nm": 29, "top_speed_kmh": 140, "weight_kg": 162, "displacement_cc": 278, "seat_height_mm": 800}}
+      ]
+    },
+    {
+      "name": "Surge EV", "slug": "surge-ev", "type": "bike", "class": "electric", "family": "Surge", "year": 2027,
+      "tagline": "Silent, instant, electric naked bike.",
+      "description": "A 17.3 kWh battery, 110 hp and 230 Nm from zero rpm, DC fast charging from 20 to 80 % in 45 minutes.",
+      "shape": {"kind": "bike", "body": "naked", "electric": true},
+      "templates": ["bike_paint", "bike_frame", "bike_wheels", "bike_seat", "bike_performance", "bike_tech", "bike_packages"],
+      "drop": ["BP01", "BP02", "BP03", "BW05", "BG01"],
+      "variants": [
+        {"code": "SR", "name": "Surge EV", "price": 21900, "default": true, "specs": {"power_hp": 110, "torque_nm": 230, "accel_0_100_s": 3.3, "top_speed_kmh": 200, "weight_kg": 220, "range_km": 260, "seat_height_mm": 800}},
+        {"code": "LR", "name": "Surge EV Long Range", "price": 25400, "specs": {"power_hp": 110, "torque_nm": 230, "accel_0_100_s": 3.4, "top_speed_kmh": 200, "weight_kg": 232, "range_km": 330, "seat_height_mm": 800}}
+      ]
+    },
+    {
+      "name": "Vintage 900", "slug": "vintage-900", "type": "bike", "class": "cafe", "family": "Vintage", "year": 2027,
+      "tagline": "Café-racer style, modern engineering.",
+      "description": "Clip-on bars, a bullet seat and a parallel twin with ride-by-wire. Classic lines, modern safety.",
+      "shape": {"kind": "bike", "body": "cafe"},
+      "templates": ["bike_paint", "bike_frame", "bike_wheels", "bike_seat", "bike_performance", "bike_tech", "bike_packages"],
+      "drop": ["BW04", "BG01", "BG04", "BG03"],
+      "variants": [
+        {"code": "BASE", "name": "Vintage 900", "price": 13900, "default": true, "specs": {"power_hp": 76, "torque_nm": 80, "accel_0_100_s": 4.5, "top_speed_kmh": 200, "weight_kg": 205, "displacement_cc": 900, "seat_height_mm": 790}},
+        {"code": "R", "name": "Vintage 1200 R", "price": 16900, "specs": {"power_hp": 98, "torque_nm": 112, "accel_0_100_s": 3.9, "top_speed_kmh": 215, "weight_kg": 212, "displacement_cc": 1200, "seat_height_mm": 810}}
+      ]
+    },
+
+    {
+      "name": "Marea 42", "slug": "marea-42", "type": "boat", "class": "speedboat", "family": "Marea", "year": 2027,
+      "tagline": "42 ft offshore centre console, stepped hull.",
+      "description": "A deep-V stepped hull built for heavy seas and triple-digit speed, with seating for 14 and a cabin below.",
+      "shape": {"kind": "boat", "body": "speedboat", "length": 12.8},
+      "templates": ["boat_hull", "boat_stripe", "boat_deck", "boat_upholstery", "boat_top", "boat_electronics", "boat_comfort", "boat_packages"],
+      "categories": [
+        {"name": "Propulsion", "slug": "propulsion", "section": "performance", "display": "list", "order": 1,
+         "options": [
+           {"code": "EN01", "name": "Twin 350 hp V8 Outboards", "price": 0, "default": true, "visual": [{"part": "engines", "value": 2}]},
+           {"code": "EN02", "name": "Triple 350 hp V8 Outboards", "price": 48000, "visual": [{"part": "engines", "value": 3}], "mods": {"power_hp": 350, "top_speed_kmh": 16, "weight_kg": 410}},
+           {"code": "EN03", "name": "Quad 450 hp V10 Outboards", "price": 129000, "visual": [{"part": "engines", "value": 4}], "mods": {"power_hp": 1100, "top_speed_kmh": 30, "weight_kg": 980}, "tag": "Flagship"}
+         ]}
+      ],
+      "variants": [
+        {"code": "CC", "name": "Marea 42 Centre Console", "price": 412000, "default": true, "specs": {"power_hp": 700, "top_speed_kmh": 96, "weight_kg": 9800, "length_m": 12.8, "beam_m": 3.6, "capacity": 14, "fuel_l": 1500}},
+        {"code": "CB", "name": "Marea 42 Cabin", "price": 468000, "specs": {"power_hp": 700, "top_speed_kmh": 92, "weight_kg": 10400, "length_m": 12.8, "beam_m": 3.6, "capacity": 12, "fuel_l": 1500, "berths": 2}}
+      ]
+    },
+    {
+      "name": "Serenity 80", "slug": "serenity-80", "type": "boat", "class": "yacht", "family": "Serenity", "year": 2027,
+      "tagline": "80 ft motor yacht with flybridge and four cabins.",
+      "description": "Full-beam master suite, a crew cabin aft, floor-to-ceiling glazing and zero-speed stabilisers.",
+      "shape": {"kind": "boat", "body": "yacht", "length": 24.4},
+      "price_scale": 3.2,
+      "templates": ["boat_hull", "boat_stripe", "boat_deck", "boat_upholstery", "boat_electronics", "boat_comfort", "boat_packages"],
+      "drop": ["MP02", "NE04", "MP01"],
+      "categories": [
+        {"name": "Engines", "slug": "engines", "section": "performance", "display": "list", "order": 1,
+         "options": [
+           {"code": "YE01", "name": "Twin 1,600 hp Diesel Shaft Drive", "price": 0, "default": true},
+           {"code": "YE02", "name": "Twin 1,900 hp Diesel with Pod Drives", "price": 385000, "mods": {"power_hp": 600, "top_speed_kmh": 9}, "tag": "Popular"},
+           {"code": "YE03", "name": "Diesel-electric Hybrid Drive", "desc": "Silent electric cruising up to 9 knots.", "price": 540000, "mods": {"range_km": 40, "weight_kg": 2800}}
+         ]},
+        {"name": "Superstructure", "slug": "superstructure", "section": "exterior", "display": "swatch", "role": "superstructure", "order": 3,
+         "options": [
+           {"code": "SS01", "name": "White", "hex": "#f3f4f2", "price": 0, "default": true},
+           {"code": "SS02", "name": "Silver Grey Metallic", "hex": "#a9adb2", "finish": "metallic", "price": 68000},
+           {"code": "SS03", "name": "Gunmetal Metallic", "hex": "#3a3e44", "finish": "metallic", "price": 68000}
+         ]},
+        {"name": "Interior Design", "slug": "interior-design", "section": "interior", "display": "list", "order": 5,
+         "options": [
+           {"code": "ID01", "name": "Light Oak & Linen", "price": 0, "default": true},
+           {"code": "ID02", "name": "Smoked Eucalyptus & Grey Leather", "price": 145000},
+           {"code": "ID03", "name": "Wenge & Cognac Leather", "price": 172000}
+         ]},
+        {"name": "Stabilisation & Tenders", "slug": "yacht-extras", "section": "comfort", "display": "list", "selection": "multi", "order": 9,
+         "options": [
+           {"code": "YX01", "name": "Gyro Stabiliser (zero-speed)", "price": 220000},
+           {"code": "YX02", "name": "Hydraulic Tender Garage with 3.5 m Jet Tender", "price": 165000},
+           {"code": "YX03", "name": "Flybridge Hot Tub", "price": 95000},
+           {"code": "YX04", "name": "Crew Cabin Aft", "price": 78000}
+         ]}
+      ],
+      "variants": [
+        {"code": "MY", "name": "Serenity 80", "price": 4200000, "default": true, "specs": {"power_hp": 3200, "top_speed_kmh": 52, "weight_kg": 62000, "length_m": 24.4, "beam_m": 6.1, "capacity": 20, "berths": 8, "fuel_l": 8000}},
+        {"code": "FLY", "name": "Serenity 80 Fly", "price": 4650000, "specs": {"power_hp": 3200, "top_speed_kmh": 50, "weight_kg": 65000, "length_m": 24.4, "beam_m": 6.1, "capacity": 24, "berths": 8, "fuel_l": 8000}}
+      ]
+    },
+    {
+      "name": "Aeolus 38", "slug": "aeolus-38", "type": "boat", "class": "sailboat", "family": "Aeolus", "year": 2027,
+      "tagline": "Performance cruising sailboat, twin rudders.",
+      "description": "A modern chined hull, twin wheels, self-tacking jib and three cabins for fast family passages.",
+      "shape": {"kind": "boat", "body": "sailboat", "length": 11.5},
+      "templates": ["boat_hull", "boat_stripe", "boat_deck", "boat_upholstery", "boat_electronics", "boat_comfort"],
+      "drop": ["NE05", "MC06", "NE04"],
+      "categories": [
+        {"name": "Sails", "slug": "sails", "section": "performance", "display": "swatch", "role": "sail", "order": 1,
+         "options": [
+           {"code": "SA01", "name": "Dacron Cruising Sails", "hex": "#f4f2ea", "price": 0, "default": true},
+           {"code": "SA02", "name": "Laminate Performance Sails", "hex": "#6a6f76", "price": 18500, "mods": {"top_speed_kmh": 1.5}},
+           {"code": "SA03", "name": "Carbon Membrane Sails", "hex": "#1a1b1d", "price": 34000, "mods": {"top_speed_kmh": 2.5}, "tag": "Performance"}
+         ]},
+        {"name": "Rig & Keel", "slug": "rig", "section": "performance", "display": "list", "selection": "multi", "order": 2,
+         "options": [
+           {"code": "RG01", "name": "In-mast Furling Mainsail", "price": 9800},
+           {"code": "RG02", "name": "Carbon Mast", "price": 42000, "mods": {"weight_kg": -180}},
+           {"code": "RG03", "name": "Shoal-draft Keel, 1.6 m", "price": 6400, "mods": {"draft_m": -0.5}},
+           {"code": "RG04", "name": "Electric Winches", "price": 7200}
+         ]}
+      ],
+      "variants": [
+        {"code": "CR", "name": "Aeolus 38", "price": 289000, "default": true, "specs": {"power_hp": 30, "top_speed_kmh": 16, "weight_kg": 7800, "length_m": 11.5, "beam_m": 3.9, "capacity": 10, "berths": 6, "draft_m": 2.1}},
+        {"code": "PF", "name": "Aeolus 38 Performance", "price": 336000, "specs": {"power_hp": 30, "top_speed_kmh": 18, "weight_kg": 7350, "length_m": 11.5, "beam_m": 3.9, "capacity": 10, "berths": 6, "draft_m": 2.4}}
+      ]
+    },
+    {
+      "name": "Twin 45", "slug": "twin-45", "type": "boat", "class": "catamaran", "family": "Twin", "year": 2027,
+      "tagline": "Power catamaran with a 360° saloon.",
+      "description": "Two efficient hulls, a 7 m beam, four cabins and a flybridge lounge with outdoor galley.",
+      "shape": {"kind": "boat", "body": "catamaran", "length": 13.7},
+      "price_scale": 1.6,
+      "templates": ["boat_hull", "boat_stripe", "boat_deck", "boat_upholstery", "boat_electronics", "boat_comfort", "boat_packages"],
+      "drop": ["MP02", "MP01"],
+      "categories": [
+        {"name": "Engines", "slug": "engines", "section": "performance", "display": "list", "order": 1,
+         "options": [
+           {"code": "CE01", "name": "Twin 230 hp Diesel", "price": 0, "default": true},
+           {"code": "CE02", "name": "Twin 370 hp Diesel", "price": 64000, "mods": {"power_hp": 280, "top_speed_kmh": 9}},
+           {"code": "CE03", "name": "Twin 200 kW Electric + Solar Roof", "price": 148000, "mods": {"range_km": 60, "power_hp": 80}, "tag": "Electric"}
+         ]}
+      ],
+      "variants": [
+        {"code": "OW", "name": "Twin 45 Owner", "price": 795000, "default": true, "specs": {"power_hp": 460, "top_speed_kmh": 41, "weight_kg": 15800, "length_m": 13.7, "beam_m": 7.0, "capacity": 16, "berths": 6, "fuel_l": 2000}},
+        {"code": "CH", "name": "Twin 45 Charter", "price": 838000, "specs": {"power_hp": 460, "top_speed_kmh": 40, "weight_kg": 16300, "length_m": 13.7, "beam_m": 7.0, "capacity": 18, "berths": 10, "fuel_l": 2000}}
+      ]
+    },
+    {
+      "name": "Lagoon 24", "slug": "lagoon-24", "type": "boat", "class": "pontoon", "family": "Lagoon", "year": 2027,
+      "tagline": "Lounge-on-the-lake pontoon for twelve.",
+      "description": "Wrap-around lounges, a tritoon option for sport performance and a fold-down boarding ladder.",
+      "shape": {"kind": "boat", "body": "pontoon", "length": 7.4},
+      "price_scale": 0.35,
+      "templates": ["boat_hull", "boat_deck", "boat_upholstery", "boat_top", "boat_electronics", "boat_comfort", "boat_packages"],
+      "drop": ["TP03", "TP04", "MC03", "MC04", "MC05", "NE02", "NE03", "NE05", "MP04", "MP03"],
+      "categories": [
+        {"name": "Outboard", "slug": "outboard", "section": "performance", "display": "list", "order": 1,
+         "options": [
+           {"code": "PO01", "name": "150 hp Outboard", "price": 0, "default": true, "visual": [{"part": "engines", "value": 1}]},
+           {"code": "PO02", "name": "250 hp Outboard (Tritoon)", "price": 14900, "visual": [{"part": "engines", "value": 1}], "mods": {"power_hp": 100, "top_speed_kmh": 18}},
+           {"code": "PO03", "name": "Twin 200 hp Outboards (Tritoon)", "price": 29800, "visual": [{"part": "engines", "value": 2}], "mods": {"power_hp": 250, "top_speed_kmh": 28}}
+         ]}
+      ],
+      "variants": [
+        {"code": "LX", "name": "Lagoon 24 LX", "price": 58900, "default": true, "specs": {"power_hp": 150, "top_speed_kmh": 50, "weight_kg": 1500, "length_m": 7.4, "beam_m": 2.6, "capacity": 12, "fuel_l": 130}},
+        {"code": "SP", "name": "Lagoon 24 Sport Tritoon", "price": 72400, "specs": {"power_hp": 150, "top_speed_kmh": 54, "weight_kg": 1680, "length_m": 7.4, "beam_m": 2.6, "capacity": 13, "fuel_l": 170}}
+      ]
+    },
+    {
+      "name": "Wave RX", "slug": "wave-rx", "type": "boat", "class": "jetski", "family": "Wave", "year": 2027,
+      "tagline": "Supercharged personal watercraft.",
+      "description": "A 1.8-litre supercharged three-cylinder, intelligent brake & reverse, and a race-derived hull.",
+      "shape": {"kind": "boat", "body": "jetski", "length": 3.4},
+      "price_scale": 0.12,
+      "templates": ["boat_hull", "boat_stripe", "boat_upholstery", "boat_electronics"],
+      "drop": ["NE01", "NE02", "NE03", "NE05", "NE04"],
+      "categories": [
+        {"name": "Performance", "slug": "pwc-performance", "section": "performance", "display": "list", "selection": "multi", "order": 1,
+         "options": [
+           {"code": "JP01", "name": "Race Intake Grate & Ride Plate", "price": 690, "mods": {"top_speed_kmh": 3}},
+           {"code": "JP02", "name": "Performance Impeller", "price": 890, "mods": {"accel_0_100_s": -0.2}},
+           {"code": "JP03", "name": "Launch Control", "price": 290}
+         ]}
+      ],
+      "variants": [
+        {"code": "RX", "name": "Wave RX", "price": 15900, "default": true, "specs": {"power_hp": 230, "top_speed_kmh": 106, "weight_kg": 360, "length_m": 3.4, "beam_m": 1.25, "capacity": 3, "fuel_l": 70}},
+        {"code": "RXS", "name": "Wave RX-S", "price": 19400, "specs": {"power_hp": 325, "top_speed_kmh": 117, "weight_kg": 372, "length_m": 3.4, "beam_m": 1.25, "capacity": 3, "fuel_l": 70}}
+      ]
+    },
+    {
+      "name": "Angler 28", "slug": "angler-28", "type": "boat", "class": "fishing", "family": "Angler", "year": 2027,
+      "tagline": "Tournament-grade centre console.",
+      "description": "Self-bailing deck, two 40-gallon livewells, 20 rod holders and a deep-V hull that keeps you dry offshore.",
+      "shape": {"kind": "boat", "body": "fishing", "length": 8.6},
+      "price_scale": 0.6,
+      "templates": ["boat_hull", "boat_stripe", "boat_deck", "boat_upholstery", "boat_top", "boat_electronics", "boat_comfort", "boat_packages"],
+      "drop": ["TP04", "MP01", "MP03", "MC03", "MC04"],
+      "categories": [
+        {"name": "Outboards", "slug": "outboards", "section": "performance", "display": "list", "order": 1,
+         "options": [
+           {"code": "AO01", "name": "Single 300 hp Outboard", "price": 0, "default": true, "visual": [{"part": "engines", "value": 1}]},
+           {"code": "AO02", "name": "Twin 250 hp Outboards", "price": 27000, "visual": [{"part": "engines", "value": 2}], "mods": {"power_hp": 200, "top_speed_kmh": 14}},
+           {"code": "AO03", "name": "Twin 300 hp Outboards", "price": 39500, "visual": [{"part": "engines", "value": 2}], "mods": {"power_hp": 300, "top_speed_kmh": 20}}
+         ]}
+      ],
+      "variants": [
+        {"code": "CC", "name": "Angler 28 CC", "price": 162000, "default": true, "specs": {"power_hp": 300, "top_speed_kmh": 80, "weight_kg": 3400, "length_m": 8.6, "beam_m": 2.9, "capacity": 10, "fuel_l": 750}},
+        {"code": "TE", "name": "Angler 28 Tournament", "price": 189000, "specs": {"power_hp": 300, "top_speed_kmh": 80, "weight_kg": 3550, "length_m": 8.6, "beam_m": 2.9, "capacity": 10, "fuel_l": 900}}
+      ]
+    },
+    {
+      "name": "Volta Marine 22", "slug": "volta-marine-22", "type": "boat", "class": "electric", "family": "Volta", "year": 2027,
+      "tagline": "Silent all-electric day runabout.",
+      "description": "A 120 kWh battery, emission-free lake cruising and DC fast charging in under an hour.",
+      "shape": {"kind": "boat", "body": "speedboat", "length": 6.8, "electric": true},
+      "price_scale": 0.4,
+      "templates": ["boat_hull", "boat_stripe", "boat_deck", "boat_upholstery", "boat_top", "boat_electronics", "boat_comfort"],
+      "drop": ["TP03", "TP04", "MC03", "MC04", "MC05", "NE02", "NE05"],
+      "categories": [
+        {"name": "Battery", "slug": "marine-battery", "section": "performance", "display": "list", "order": 1,
+         "options": [
+           {"code": "MB01", "name": "80 kWh Battery", "price": 0, "default": true},
+           {"code": "MB02", "name": "120 kWh Battery", "price": 21000, "mods": {"range_km": 40, "weight_kg": 290}}
+         ]}
+      ],
+      "variants": [
+        {"code": "E", "name": "Volta Marine 22", "price": 129000, "default": true, "specs": {"power_hp": 270, "top_speed_kmh": 56, "weight_kg": 2100, "length_m": 6.8, "beam_m": 2.4, "capacity": 8, "range_km": 80}},
+        {"code": "EP", "name": "Volta Marine 22 Performance", "price": 149000, "specs": {"power_hp": 400, "top_speed_kmh": 65, "weight_kg": 2150, "length_m": 6.8, "beam_m": 2.4, "capacity": 8, "range_km": 70}}
+      ]
+    }
+  ]
+}

@@ -32,8 +32,8 @@ if defined CLANG_BIN (
     )
 
     echo [Build] Compiling and linking kraft_backend.exe...
-    "!CLANG_BIN!" --target=x86_64-w64-mingw32 -std=c++17 -O2 -static -static-libgcc -static-libstdc++ ^
-        -I include src\server.cpp src\db.cpp bin\sqlite3.o ^
+    "!CLANG_BIN!" --target=x86_64-w64-mingw32 -std=c++17 -O2 -D_WIN32_WINNT=0x0A00 -static -static-libgcc -static-libstdc++ ^
+        -I include src\server.cpp src\db.cpp src\engine.cpp src\seed.cpp bin\sqlite3.o ^
         -o bin\kraft_backend.exe -lws2_32
 
     if !ERRORLEVEL! EQU 0 (
@@ -69,8 +69,8 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [Build] Compiling Kraft C++ backend with MSVC...
-cl.exe /nologo /O2 /std:c++17 /EHsc /utf-8 /I include ^
-    src\server.cpp src\db.cpp src\sqlite3.c ^
+cl.exe /nologo /O2 /std:c++17 /EHsc /utf-8 /D_WIN32_WINNT=0x0A00 /I include ^
+    src\server.cpp src\db.cpp src\engine.cpp src\seed.cpp src\sqlite3.c ^
     /Fe:bin\kraft_backend.exe ^
     /link ws2_32.lib
 

@@ -1,302 +1,411 @@
-/*
-  Kraft Configurator — Quni4m Tactile Hardware System & Crystal Blue Identity
-  Modeled after Quni4m / HQC:
-  - Dark anodized machined aluminum chassis with -45 deg light-physics layer
-  - Extruded tactile controls (.raised), milled debossed slots (.milled)
-  - Crystal Blue LED and bloom accents (#00d2ff, #70e1ff, #0088cc)
-  - Precision Cascadia/JetBrains monospace telemetry and segment readouts
-*/
+/* Kraft Configurator — design system
+   Clean, light, typographic. Black primary actions, quiet grey surfaces,
+   hairline dividers and generous whitespace; the vehicle is the hero. */
 
 :root {
-  /* --- Quni4m Machined Dark Chassis --- */
-  --bg: #0c0f13;
-  --panel: #13171f;
-  --panel-2: #18202a;
-  --surface: #1e2634;
-  --surface-hi: #273344;
-  --field: #080b0f;
-  --canvas: #050709;
-  --line: #030508;
-  --line-soft: #222d3b;
-  --void: #0a0d11;
+  --bg: #ffffff;
+  --surface: #f2f2f2;
+  --surface-2: #e8e8ea;
+  --surface-hover: #e3e4e5;
+  --ink: #0e0e12;
+  --ink-2: #4b4c52;
+  --ink-3: #7c7d84;
+  --line: #d8d9dc;
+  --line-strong: #b4b5ba;
+  --primary: #0e0e12;
+  --primary-ink: #ffffff;
+  --primary-hover: #2c2d33;
+  --focus: #1a44ea;
+  --success: #197e10;
+  --warning: #b8650a;
+  --danger: #c4121d;
+  --info: #2762ec;
 
-  --text: #cfd8e3;
-  --text-hi: #f0f4f9;
-  --text-dim: #6d7c8e;
-  --text-primary: #f0f4f9;
-  --text-secondary: #8c9cb0;
-  --text-tertiary: #58687a;
+  --stage-top: #f6f6f7;
+  --stage-bottom: #d9dadd;
 
-  /* --- Crystal Blue Spectrum (Replacing Purple) --- */
-  --crystal-blue: #00d2ff;          /* Primary vibrant crystal cyan/blue */
-  --crystal-bright: #70e1ff;        /* Specular highlight & active edge */
-  --crystal-deep: #0077b6;          /* Deep crystal metallic shadow */
-  --crystal-dark: #003459;          /* Deep base shadow */
-  --crystal-ice: #e0f7fa;           /* Pure ice white-cyan highlight */
-  --crystal-dim: rgba(0, 210, 255, 0.14);
-  --crystal-glow: rgba(0, 210, 255, 0.35);
-  --crystal-glow-strong: rgba(0, 210, 255, 0.7);
-
-  /* Primary Accent Aliases */
-  --accent: var(--crystal-blue);
-  --accent-2: var(--crystal-bright);
-  --accent-dim: var(--crystal-dim);
-  --accent-glow: var(--crystal-glow);
-
-  /* Backward Compatibility: remap purple tokens to crystal blue ramp */
-  --purple-300: var(--crystal-bright);
-  --purple-500: var(--crystal-blue);
-  --purple-700: var(--crystal-deep);
-  --purple-900: #041b2d;
-  --metal-silver: #9ab3c6;
-
-  /* --- LED Indicators --- */
-  --led-crystal: #00d2ff;
-  --led-emerald: #46d18a;
-  --led-amber:   #ffaa00;
-  --led-red:     #ff5468;
-  --success:     #46d18a;
-  --danger:      #ff5468;
-
-  /* Brushed crystal metal gradient */
-  --gradient-metal: linear-gradient(135deg, #021a2c 0%, #004d73 45%, #00d2ff 75%, #0077b6 100%);
-  --gradient-crystal: linear-gradient(180deg, rgba(0, 210, 255, 0.18) 0%, rgba(0, 119, 182, 0.05) 100%);
-
-  /* --- Tactile Light-Physics Layer (from Quni4m) --- */
-  --face-hi:  #243042;              /* Top edge catches light */
-  --face:     #1a2330;              /* Mid raised face */
-  --face-lo:  #10151e;              /* Debossed recess floor */
-  --rim-hi:   rgba(255, 255, 255, 0.09); /* 1px top-left catch */
-  --rim-lo:   rgba(0, 0, 0, 0.7);   /* 1px bottom-right shadow */
-
-  /* Extruded raised face */
-  --extrude: inset 1px 1px 0 var(--rim-hi), inset -1px -1px 1px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.6);
-  /* Debossed recessed slot */
-  --deboss: inset 1px 1px 3px rgba(0, 0, 0, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.04);
-
-  /* Tactile physics motion */
-  --snap-in: 70ms ease-out;
-  --snap-out: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  --press-shift: translate(0.6px, 0.6px);
-
-  /* --- Typography --- */
-  --font-display: "Space Grotesk", system-ui, sans-serif;
-  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Cascadia Mono", "JetBrains Mono", "Consolas", monospace;
-  --font: 11px/1.35 "Segoe UI", system-ui, sans-serif;
-  --mono: var(--font-mono);
-
-  /* --- Layout & Radii --- */
   --radius-sm: 4px;
-  --radius: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow-1: 0 1px 2px rgba(14, 14, 18, 0.06), 0 2px 8px rgba(14, 14, 18, 0.06);
+  --shadow-2: 0 8px 32px rgba(14, 14, 18, 0.14);
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --header-h: 64px;
+  --panel-w: 440px;
+  --bar-h: 76px;
+
+  color-scheme: light;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 html,
-body,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
 #app {
   height: 100%;
-  margin: 0;
-  padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: var(--font);
-  overflow: hidden;
-  user-select: none;
-  -webkit-user-select: none;
-  overscroll-behavior: none;
 }
 
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
 input,
-textarea,
-[contenteditable="true"] {
-  user-select: text;
-  -webkit-user-select: text;
-}
-
-img {
-  -webkit-user-drag: none;
-  user-drag: none;
+select,
+textarea {
+  font: inherit;
+  color: inherit;
 }
 
 button {
-  font-family: var(--font-body);
-  border-radius: var(--radius);
   cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
 }
 
-input {
-  font-family: var(--font-mono);
-  border-radius: var(--radius);
-}
-
-/* Thin Quni4m-style scrollbars */
-*::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-*::-webkit-scrollbar-thumb {
-  background: #283444;
-  border-radius: 4px;
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: var(--crystal-deep);
-}
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* --- Tactile Physical Classes --- */
-.raised {
-  background: linear-gradient(180deg, var(--face-hi), var(--face));
-  box-shadow: var(--extrude);
-  border: none;
-}
-.raised:active {
-  transform: var(--press-shift);
-  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.65), 0 0 0 rgba(0, 0, 0, 0);
-  transition: transform var(--snap-in), box-shadow var(--snap-in);
-}
-
-.milled {
-  background: var(--face-lo);
-  box-shadow: var(--deboss);
-  border: none;
-}
-
-/* Layout helpers */
-.row {
-  display: flex;
-  align-items: center;
-}
-.col {
-  display: flex;
-  flex-direction: column;
-}
-.dim {
-  color: var(--text-dim);
-}
-.mono {
-  font-family: var(--font-mono);
-}
-.sep {
-  width: 1px;
-  align-self: stretch;
-  background: var(--line);
-  margin: 0 6px;
-}
-.grow {
-  flex: 1 1 auto;
-}
-
-/* Flat tactile control surface chips (Quni4m) */
-.chip {
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
-  color: var(--text);
-  padding: 3px 8px;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-  border-radius: var(--radius);
-  font-size: 11px;
-  font-family: var(--font-mono);
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-.chip:hover {
-  border-color: var(--crystal-blue);
-  color: var(--text-hi);
-}
-.chip.on {
-  background: var(--crystal-blue);
-  color: #051019;
-  border-color: var(--crystal-bright);
-  box-shadow: 0 0 8px var(--crystal-glow);
-  font-weight: 600;
-}
-
-/* Tactile tool buttons (Quni4m .tb) */
-.tb {
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
-  color: var(--text);
-  min-width: 24px;
-  height: 22px;
-  display: inline-grid;
-  place-items: center;
-  cursor: pointer;
-  padding: 0 6px;
-  font-size: 11px;
-  border-radius: var(--radius);
-  transition: all 0.15s ease;
-}
-.tb:hover {
-  border-color: var(--crystal-blue);
-  color: var(--crystal-bright);
-}
-.tb.on {
-  color: var(--crystal-blue);
-  border-color: var(--crystal-blue);
-  background: rgba(0, 210, 255, 0.1);
-  box-shadow: 0 0 9px var(--crystal-glow);
-  text-shadow: 0 0 8px var(--crystal-glow);
-}
-
-/* Ambient Crystal Blue Glow */
-#app::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(700px circle at 15% 15%, rgba(0, 210, 255, 0.08), transparent 60%),
-    radial-gradient(600px circle at 85% 85%, rgba(0, 119, 182, 0.09), transparent 60%);
-  animation: drift 26s ease-in-out infinite alternate;
-}
-
-@keyframes drift {
-  0% {
-    transform: translate(0, 0) scale(1);
-  }
-  100% {
-    transform: translate(2%, -2%) scale(1.06);
-  }
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 h1,
 h2,
 h3,
 h4 {
-  font-family: var(--font-display);
-  font-weight: 700;
   margin: 0;
+  font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--text-hi);
+  line-height: 1.15;
 }
 
-.mono-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+p {
+  margin: 0;
+}
+
+/* ---------- Type scale ---------- */
+.display {
+  font-size: clamp(32px, 4.6vw, 56px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+.h2 {
+  font-size: clamp(22px, 2.4vw, 30px);
+  font-weight: 600;
+}
+.h3 {
+  font-size: 20px;
+  font-weight: 600;
+}
+.small {
+  font-size: 14px;
+}
+.xsmall {
+  font-size: 12px;
+}
+.muted {
+  color: var(--ink-2);
+}
+.subtle {
+  color: var(--ink-3);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--ink-3);
 }
 
-/* Visible keyboard focus everywhere in Crystal Blue */
-:focus-visible {
-  outline: 2px solid var(--crystal-blue);
-  outline-offset: 2px;
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 24px;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color 0.18s var(--ease),
+    border-color 0.18s var(--ease),
+    color 0.18s var(--ease);
+}
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-ink);
+}
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+.btn-secondary {
+  background: transparent;
+  border: 1.5px solid var(--ink);
+}
+.btn-secondary:hover {
+  background: var(--surface);
+}
+.btn-ghost {
+  background: transparent;
+}
+.btn-ghost:hover {
+  background: var(--surface);
+}
+.btn-sm {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  transition: background-color 0.15s var(--ease);
+}
+.icon-btn:hover {
+  background: rgba(14, 14, 18, 0.06);
+}
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.link:hover {
+  color: var(--ink-2);
+}
+
+/* ---------- Form ---------- */
+.input,
+.select {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  transition: border-color 0.15s var(--ease);
+}
+.input:hover,
+.select:hover {
+  border-color: var(--ink-2);
+}
+.input:focus,
+.select:focus {
+  border-color: var(--ink);
+  outline: none;
+}
+textarea.input {
+  height: auto;
+  min-height: 96px;
+  padding: 12px 14px;
+  resize: vertical;
+}
+.label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+/* ---------- Tags & chips ---------- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.tag-dark {
+  background: var(--ink);
+  color: #fff;
+}
+.tag-success {
+  background: #e3f1e1;
+  color: var(--success);
+}
+.tag-info {
+  background: #e4ebfd;
+  color: var(--info);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 18px;
+  border: 1.5px solid var(--line);
+  font-size: 14px;
+  background: var(--bg);
+  transition:
+    border-color 0.15s var(--ease),
+    background-color 0.15s var(--ease);
+}
+.chip:hover {
+  border-color: var(--ink-2);
+}
+.chip.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+.divider {
+  height: 1px;
+  background: var(--line);
+  border: 0;
+  margin: 0;
+}
+
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex;
+  gap: 28px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  position: relative;
+  padding: 14px 0 12px;
+  font-size: 15px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: color 0.15s var(--ease);
+}
+.tab:hover {
+  color: var(--ink);
+}
+.tab.active {
+  color: var(--ink);
+  font-weight: 600;
+}
+.tab.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--ink);
+}
+
+/* ---------- Layout helpers ---------- */
+.container {
+  width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
+  padding: 0 clamp(16px, 4vw, 56px);
+}
+.row {
+  display: flex;
+  align-items: center;
+}
+.spacer {
+  flex: 1;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c9cacd;
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a5a6ab;
+  background-clip: content-box;
+  border: 3px solid transparent;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * {
-    animation-duration: 0.001ms !important;
-    transition-duration: 0.001ms !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

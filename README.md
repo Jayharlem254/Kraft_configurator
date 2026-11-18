@@ -1,316 +1,119 @@
 # Kraft Configurator
 
-A real-time, hardware-grade 3D vehicle configurator for high-performance automobiles, offshore powerboats, and super-naked motorbikes. Kraft Configurator allows users to inspect 3D models in an interactive studio, customize exterior colors, materials, wheels, and aerodynamic trims, upload custom 3D vehicle assets, and view live pricing and hardware telemetry updates in real time.
-
-Re-engineered following the architecture, mechanisms, and tactile hardware design language of **Quni4m (HQC)**:
-- **High-Performance C++ Engine**: Native C++17 server (`cpp-httplib` + embedded SQLite 3) delivering sub-millisecond latency, zero-copy static file streaming, high-throughput multipart 3D model uploads, and static Single Page Application (SPA) hosting.
-- **Frontend 3D Studio**: Built with Svelte, Vite, and Three.js / Threlte featuring a **Crystal Blue** tactile industrial aesthetic, machined aluminum chassis, rotary encoders, slide faders, and live hardware telemetry.
-- **Integrated 3D Model Uploader**: Direct in-browser dropzone for streaming `.glb`, `.gltf`, and `.obj` vehicle models into the C++ backend repository with automatic catalog registration and SQLite synchronization.
-- **Zero-Friction Launch**: Single-command startup via `run.bat`.
-
----
-
-## Table of Contents
-
-- [System Architecture](#system-architecture)
-- [Project Directory Structure](#project-directory-structure)
-- [Quick Start Guide](#quick-start-guide)
-- [3D Model Upload Engine](#3d-model-upload-engine)
-- [REST API Reference](#rest-api-reference)
-- [Design System & Hardware Controls](#design-system--hardware-controls)
-- [Asset Pipeline](#asset-pipeline)
-- [Building & Compiling](#building--compiling)
-- [Technology Stack](#technology-stack)
-
----
-
-## System Architecture
+A real-time 3D configurator for **cars, motorcycles and boats in every class**, in the spirit of premium online car configurators. You choose a model and variant, then configure paint, wheels, interior, performance, technology, comfort and packages. A native C++ rules engine validates and prices every change, and the vehicle restyles live in 3D.
 
 ```
-                    ┌────────────────────────────────────────────────────────┐
-                    │                    WEB CLIENT / SPA                    │
-                    │         Svelte + Vite + Three.js / Threlte             │
-                    │   Tactile UI • 3D Viewport • Uploader • Telemetry      │
-                    └───────────────────────────┬────────────────────────────┘
-                                                │
-                 HTTP REST / Multipart Uploads  │  Static Assets & Models
-                                                │
-                    ┌───────────────────────────▼────────────────────────────┐
-                    │               KRAFT C++ ENGINE (Native)                │
-                    │               cpp-httplib Server (Port 8000)           │
-                    │                                                        │
-                    │  ┌────────────────────┐     ┌───────────────────────┐  │
-                    │  │   REST Handlers    │     │ Static Media Handler  │  │
-                    │  │  - Health Telemetry│     │ Zero-copy stream      │  │
-                    │  │  - Fleet Catalog   │     │ Range / ETag caching  │  │
-                    │  │  - Model Uploader  │     │ /media/models/*.glb   │  │
-                    │  │  - Configurations  │     └───────────┬───────────┘  │
-                    │  └─────────┬──────────┘                 │              │
-                    │            │ Write / Read               │ Read File    │
-                    │            ▼                            ▼              │
-                    │  ┌────────────────────┐     ┌───────────────────────┐  │
-                    │  │ SQLite 3 (WAL Mode)│     │  Filesystem Storage   │  │
-                    │  │ kraft_configurator │     │  /media/models/       │  │
-                    │  │ .db                │     │  /media/thumbnails/   │  │
-                    │  └────────────────────┘     └───────────────────────┘  │
-                    └────────────────────────────────────────────────────────┘
+┌──────────────────────────────── Browser (Svelte 5 + three.js) ────────────────────────────────┐
+│ Model range · Configurator · Summary · Garage · Compare · Studio                              │
+│                                                                                               │
+│ Kraft Stage (3D engine)                    Configurator state                                 │
+│  • procedural models for 30+ body classes   • sends {variant, selections, changed}            │
+│  • GLB/GLTF (Draco + Meshopt) with automatic • renders the engine's resolved build            │
+│    material-role binding                    • undo / redo · shareable URL · Kraft codes       │
+│  • render-on-demand, adaptive resolution                                                      │
+└────────────────────────────────────────────┬──────────────────────────────────────────────────┘
+                                             │ REST / JSON (ETag-cached catalog)
+┌────────────────────────────────────────────▼──────────────────────────────────────────────────┐
+│ Kraft Configuration Engine (C++17, cpp-httplib, SQLite WAL)                                    │
+│  CatalogCache — immutable versioned in-memory snapshot, rebuilt only after writes             │
+│  RulesEngine  — availability · single-choice · requires (A|B) · excludes · package includes   │
+│                 · conflict resolution by recency · pricing · live technical specs             │
+│  SeedLibrary  — data/catalog_seed.json: option templates + full vehicle line-up               │
+└───────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
+## Quick start
 
-## Project Directory Structure
-
-```
-Kraft_configurator/
-├── run.bat                          # Single-command launcher (builds & starts C++ engine + browser)
-├── package.json                     # Monorepo scripts orchestrator
-├── README.md                        # Master project documentation
-│
-└── Kraft_configurator/
-    ├── backend-cpp/                 # High-performance C and C++ Engine
-    │   ├── src/
-    │   │   ├── server.cpp           # Multi-threaded HTTP server, routing, upload handler
-    │   │   ├── db.cpp & db.hpp      # SQLite3 data access layer, migrations & schema
-    │   │   ├── models.hpp           # Data structures (Vehicle, OptionCategory, Configuration)
-    │   │   └── sqlite3.c            # SQLite 3.45 C amalgamation engine
-    │   ├── include/
-    │   │   ├── httplib.h            # Single-header C++ HTTP/HTTPS server (cpp-httplib)
-    │   │   ├── json.hpp             # Modern C++ JSON library (nlohmann/json)
-    │   │   └── sqlite3.h            # SQLite C API header
-    │   ├── bin/
-    │   │   └── kraft_backend.exe    # Compiled standalone C++ binary
-    │   ├── build.bat                # Windows automated compiler script (Clang / MSVC)
-    │   ├── CMakeLists.txt           # Cross-platform CMake build configuration
-    │   └── README.md                # C++ backend specific documentation
-    │
-    ├── frontend/                    # Svelte + Vite + Three.js Client UI
-    │   ├── src/
-    │   │   ├── App.svelte           # Root application shell (Cockpit, TopBar, StatusBar)
-    │   │   ├── app.css              # Quni4m Crystal Blue variables & tactile light physics
-    │   │   ├── main.js              # Application mount point
-    │   │   └── lib/
-    │   │       ├── api.js           # REST API client & upload helper
-    │   │       ├── selections.js    # Configuration pricing & selection engine
-    │   │       ├── mockData.js      # Embedded offline vehicle catalog preview
-    │   │       └── components/
-    │   │           ├── TopBar.svelte             # Machined header with LED telemetry & mode switcher
-    │   │           ├── StatusBar.svelte          # Hardware bottom bar with price counter & status
-    │   │           ├── VehicleGallery.svelte     # Fleet catalog with interactive cards & upload card
-    │   │           ├── VehicleOverview.svelte    # Technical vehicle spec deck & blueprint
-    │   │           ├── Viewer3D.svelte           # 3D Studio canvas shell, HUD chrome & tools
-    │   │           ├── Viewer3DScene.svelte      # Three.js / Threlte WebGL scene & material binder
-    │   │           ├── ConfiguratorPanel.svelte  # Option category racks & finishes
-    │   │           ├── ModelUploader.svelte      # Dedicated 3D vehicle model upload studio
-    │   │           ├── ModelInspector.svelte     # Dev/QA mesh & material channel inspector
-    │   │           └── controls/                 # Hardware control components
-    │   │               ├── Knob.svelte           # Tactile rotary encoder with crystal light ring
-    │   │               ├── Fader.svelte          # Recessed linear slider
-    │   │               └── ModeSwitch.svelte     # Machined segmented selector
-    │   ├── dist/                    # Compiled static production bundle
-    │   ├── package.json             # Frontend NPM scripts & dependencies
-    │   └── vite.config.js           # Vite bundler configuration & /api proxy
-    │
-    ├── backend/                     # Reference Python/Django service (preserved for parity/media)
-    │   ├── media/                   # Media repository
-    │   │   ├── models/              # Stored 3D vehicle models (.glb)
-    │   │   └── thumbnails/          # Vehicle thumbnails and previews
-    │   └── manage.py
-    │
-    └── asset-pipeline/              # Java glTF asset optimization & validation toolchain
-        ├── pom.xml                  # Maven build descriptor
-        ├── src/                     # Asset inspection, draco compression & validation
-        └── scripts/                 # Ingestion & conversion scripts
-```
-
----
-
-## Quick Start Guide
-
-### Option 1: One-Click Launch (Recommended)
-Double-click **`run.bat`** in the project root, or execute from PowerShell / Terminal:
 ```cmd
-.\run.bat
+run.bat
 ```
 
-**What this does automatically:**
-1. Detects `kraft_backend.exe`. If missing, compiles it automatically with Clang or MSVC.
-2. Checks for `frontend/dist`. If missing, installs npm packages and builds the Svelte UI.
-3. Launches the native C++ engine on port `8000`.
-4. Automatically opens `http://127.0.0.1:8000` in your default web browser.
+This builds the engine and the UI if they are missing, starts the engine on port 8000 and opens `http://127.0.0.1:8000`.
 
----
+Development with hot reload:
 
-### Option 2: Running Development Mode
-Run the C++ backend and the Vite development server with hot-module replacement (HMR):
-
-1. **Start the C++ Backend Engine:**
-   ```cmd
-   cd Kraft_configurator\backend-cpp
-   .\bin\kraft_backend.exe --port 8000
-   ```
-
-2. **In a second terminal, start the Vite Dev Server:**
-   ```bash
-   cd Kraft_configurator\frontend
-   npm install
-   npm run dev
-   ```
-   *Vite proxies `/api` and `/media` requests directly to `http://127.0.0.1:8000`.*
-
----
-
-## 3D Model Upload Engine
-
-Kraft Configurator features an integrated 3D model ingestion workflow directly connected to the native C++ backend.
-
-### Upload Features
-- **File Format Support**: Accepts `.glb` (glTF 2.0 Binary, recommended), `.gltf`, and `.obj` files up to **200 MB**.
-- **Two Ingestion Modes**:
-  1. **New Vehicle Entry**: Uploads the 3D file and creates a new catalog vehicle with name, category (Car, Boat, Bike), tagline, description, base price, and automatically generated option categories.
-  2. **Attach to Existing Vehicle**: Select any registered vehicle from the fleet catalog and replace/assign its 3D model.
-- **Backend File Management**:
-  - Sanitizes model filenames and adds unique timestamps to prevent collisions.
-  - Saves models directly to `/media/models/<filename>`.
-  - Instantly updates SQLite records and serves the model with byte-range support.
-- **One-Click Viewing**: Immediately upon successful upload, click **LAUNCH IN 3D STUDIO** to jump straight into configuring the vehicle in real-time WebGL.
-
-### Accessing the Uploader in the UI
-- **From TopBar**: Click the **`UPLOAD 3D`** segment in the main navigation switch.
-- **From Fleet Catalog**: Click the **`IMPORT 3D MODEL`** card at the end of the vehicle catalog grid.
-
----
-
-## REST API Reference
-
-The C++ backend provides 100% DRF-compatible REST endpoints:
-
-### 1. 3D Model Upload
-- **`POST /api/vehicles/upload`** (Alias: `/api/upload`)
-  - **Content-Type**: `multipart/form-data`
-  - **Form Fields**:
-    - `file` *(Required)*: Binary 3D model file (`.glb`, `.gltf`, `.obj`).
-    - `name` *(Optional)*: Vehicle name (e.g. `"Apex GT Prototype"`).
-    - `vehicle_id` *(Optional)*: ID of an existing vehicle to update.
-    - `vehicle_slug` *(Optional)*: Slug of an existing vehicle to update.
-    - `vehicle_type` *(Optional)*: `"car"` | `"boat"` | `"bike"` (default: `"car"`).
-    - `base_price` *(Optional)*: Base price in USD (e.g. `125000`).
-    - `tagline` *(Optional)*: Short tagline description.
-    - `description` *(Optional)*: Detailed technical description.
-  - **Sample Response (`201 Created`)**:
-    ```json
-    {
-      "status": "success",
-      "message": "3D model uploaded and saved successfully.",
-      "file_path": "/media/models/apex_gt_1790501813.glb",
-      "filename": "apex_gt_1790501813.glb",
-      "size_bytes": 18390888,
-      "vehicle": {
-        "id": 5,
-        "name": "Apex GT Prototype",
-        "slug": "apex-gt-prototype-1813",
-        "vehicle_type": "car",
-        "base_price": "125000.00",
-        "model_file": "/media/models/apex_gt_1790501813.glb",
-        "option_categories": [...]
-      }
-    }
-    ```
-
-### 2. Vehicle Catalog
-- **`GET /api/vehicles/`**
-  - Query parameters: `?vehicle_type=car|boat|bike`
-  - Returns a list of published vehicles with base prices, thumbnails, and model file paths.
-- **`GET /api/vehicles/:slug/`**
-  - Returns complete vehicle detail including nested `option_categories` and `choices` (swatches, price deltas, mesh targets).
-
-### 3. Build Configurations
-- **`GET /api/configurations/`**
-  - Query parameter: `?session_key=<key>`
-  - Retrieves saved configuration builds.
-- **`POST /api/configurations/`**
-  - Body: `{"vehicle": 1, "option_ids": [2, 7, 14], "session_key": "..."}`
-  - Calculates total price and stores configuration selections.
-- **`GET /api/configurations/:id/`**
-  - Retrieves an existing configuration by UUID.
-- **`PATCH /api/configurations/:id/`**
-  - Updates selected options for a configuration.
-- **`DELETE /api/configurations/:id/`**
-  - Removes a saved configuration (`204 No Content`).
-
-### 4. Telemetry & Media
-- **`GET /api/health`**
-  - Returns C++ engine status, vehicle count, uptime, and engine version.
-- **`GET /media/*`**
-  - Static file streaming endpoint for 3D model geometry (`.glb`), thumbnails, and textures with `Accept-Ranges`, `ETag`, and `CORS` headers enabled.
-
----
-
-## Design System & Hardware Controls
-
-The UI was crafted from scratch based on the **Quni4m (HQC)** tactile design language:
-- **Chassis & Surfaces**: Deep machined bead-blasted aluminum shades (`#0c0f13`, `#13171f`, `#1e2634`).
-- **Tactile Light Physics**:
-  - Convex / raised surfaces (`.raised`) with crisp specular highlights.
-  - Recessed / milled sockets (`.milled`) with internal occlusion shadows.
-- **Crystal Blue Signature**:
-  - Primary accent `#00d2ff`, bright neon `#70e1ff`, deep sapphire `#0077b6`.
-  - Ambient luminous bloom on active controls and status LEDs.
-- **Hardware Controls**:
-  - **`Knob.svelte`**: Smooth rotary encoder with radial light arc and value readout.
-  - **`Fader.svelte`**: Recessed linear slide fader for continuous adjustment.
-  - **`ModeSwitch.svelte`**: Machined segment rocker for cockpit view transitions.
-  - **`StatusBar.svelte`**: Continuous live price accumulator and C++ engine heartbeat indicator.
-
----
-
-## Asset Pipeline
-
-The `asset-pipeline/` directory contains a dedicated Java utility designed for 3D vehicle asset processing:
-- **Mesh Validation**: Inspects glTF/GLB vertex counts, submesh hierarchy, and material channels.
-- **Draco Compression**: Optimizes 3D asset file size for sub-second web delivery.
-- **Manifest Generator**: Generates `manifest.json` catalog index, which can be directly imported into the C++ engine via `--import-manifest <path> --publish`.
-
----
-
-## Building & Compiling
-
-### Compiling C++ Backend Manually
-Requirements: Clang++ (via LLVM / MinGW-w64) or MSVC (`cl.exe`).
-
-Using the build script:
 ```cmd
-cd Kraft_configurator\backend-cpp
-build.bat
+backend-cpp\bin\kraft_backend.exe --port 8000
+cd frontend && npm install && npm run dev      :: http://localhost:3000 (proxies /api and /media)
 ```
 
-Or using Clang manually:
-```cmd
-clang++ --target=x86_64-w64-mingw32 -std=c++17 -O2 -static -I include src\server.cpp src\db.cpp bin\sqlite3.o -o bin\kraft_backend.exe -lws2_32
-```
+## What you can configure
 
-### Compiling Frontend UI Manually
-Requirements: Node.js 18+ and npm.
-```bash
-cd Kraft_configurator\frontend
-npm install
-npm run build
-```
-This generates the optimized production bundle in `Kraft_configurator/frontend/dist/`.
-
----
-
-## Technology Stack
-
-| Layer | Technologies |
+| Type | Classes (procedural 3D) |
 |---|---|
-| **C++ Engine** | C++17, `cpp-httplib`, `nlohmann/json`, SQLite 3 (WAL mode), WinSock2 |
-| **Frontend** | Svelte 4, Vite 5, Three.js 0.160+, `@threlte/core`, `@threlte/extras` |
-| **3D Rendering** | WebGL 2, PBR Materials, RoomEnvironment IBL, ACES Filmic Tone Mapping |
-| **Asset Pipeline**| Java 17+, Maven, glTF-Transform |
-| **Styling** | Vanilla CSS with custom hardware design tokens & CSS variables |
+| Cars | coupé, convertible (roof open/closed), supercar, sedan, electric, SUV, hatchback, touring/wagon, pickup, van/MPV, off-road |
+| Motorcycles | sport, naked, cruiser, touring, adventure, motocross, scooter, electric, café racer |
+| Boats | speedboat/centre console, motor yacht, sailboat, catamaran, pontoon, personal watercraft, fishing, electric |
 
----
+Each vehicle has **variants** (trims with their own price and specs) and option **sections**:
 
-## License
+- **Exterior:** solid, metallic, pearl, matte and chrome paints, plus trim packages, glass, roof (body, glass, contrast, carbon), stripes and aero.
+- **Wheels:** wheel designs (spoke count and style) and caliper colours.
+- **Interior:** leather and microfibre colours, seats and trims.
+- **Performance:** power kits, brakes, suspension, batteries and propulsion.
+- **Technology, comfort and packages.**
 
-Crafted for Kraft Configurator. All rights reserved.
+Options carry **rules**. For example, the Performance Kit *requires* Sport Chrono and the Sport Exhaust. Ceramic brakes *include* yellow calipers. The Lightweight Package *excludes* the glass roof and *includes* bucket seats, which in turn *exclude* seat ventilation. Some options are only available on certain variants. The engine resolves every change, tells the UI what it added or removed and why, and recomputes price and specs (power, 0–100, top speed, weight, range and more).
+
+Configurations can be saved (`My Garage`), reopened by an 8-character **Kraft code** (`#/code/KXXXXXXX`), shared as a URL, printed or saved as a PDF from the summary page, and compared side by side.
+
+## 3D engine (`frontend/src/lib/three`)
+
+| File | Role |
+|---|---|
+| `Stage.js` | Renderer: render-on-demand loop, adaptive pixel ratio while orbiting, static shadow map, camera tweens, cut-away interior view, environments (studio, gallery, dusk, night), snapshots |
+| `materials.js` | Role-based PBR material library (paint, rims, calipers, interior, hull, deck, sail, …) and the finish presets |
+| `procedural/car.js`, `bike.js`, `boat.js` | Parametric vehicle builders; structural options (wheel design, spoiler, roof, engines, T-top, luggage, …) rebuild geometry |
+| `glb.js` | Uploaded models: Draco/Meshopt decoding, orientation and scale normalisation, automatic role detection by material name |
+| `thumbnails.js` | Gallery thumbnails rendered from the same engine through one shared hidden WebGL context, cached in localStorage |
+
+Uploaded GLBs bind roles by material name (`carpaint`, `rim`/`jante`, `caliper`, `seat`, `hull`, …). When nothing matches, the largest light-coloured material becomes the paint. You can override this per vehicle with `material_map` (`PATCH /api/vehicles/:id {"material_map": {"paint": ["MyBodyMat"]}}`).
+
+## Engine (`backend-cpp`)
+
+```
+src/models.hpp   domain model (Vehicle, Variant, OptionCategory, OptionChoice, Configuration)
+src/db.cpp       SQLite access layer: statement helper, thread-safe, additive migrations
+src/engine.cpp   CatalogCache + RulesEngine
+src/seed.cpp     catalog_seed.json loader / template expansion / legacy upgrade
+src/server.cpp   HTTP API, static UI + media serving, cache headers
+data/catalog_seed.json
+```
+
+Build: `backend-cpp\build.bat` (Clang or MSVC) or CMake. Options:
+
+```
+--port 8000  --db <file>  --media <dir>  --ui <dir>  --seed <file>
+--reseed     re-apply the seed catalog     --no-seed   skip it
+--threads N  worker threads                 --import-manifest <file> [--publish]
+```
+
+The database defaults to `backend-cpp/bin/kraft_configurator.db`. Migrations are additive. Vehicles uploaded before v3 automatically get variants and the full option set for their type.
+
+### REST API
+
+| Method & path | Purpose |
+|---|---|
+| `GET /api/health` | status, catalog version, rules-engine timings |
+| `GET /api/catalog/meta` | types and classes with counts |
+| `GET /api/vehicles/?vehicle_type=&body_class=&q=` | model range (ETag) |
+| `GET /api/vehicles/:slug/` | full definition: variants + option tree (ETag) |
+| `POST /api/vehicles/:slug/evaluate` | `{variant, selections[], changed, deselect}` → `{resolved[], changes[], price{}, specs{}, selections[]}` |
+| `POST /api/configurations/` | save (re-evaluated server-side) → returns `code` |
+| `GET/PATCH/DELETE /api/configurations/:id-or-code/` | load, update or delete a saved build |
+| `POST /api/vehicles/upload` | multipart 3D upload (`file`, `name`, `vehicle_type`, `body_class`, `base_price` or `vehicle_id`) |
+| `POST /api/vehicles/`, `PATCH/DELETE /api/vehicles/:id/` | catalog management |
+| `GET /api/models`, `DELETE /api/models/:filename` | model files |
+
+## Extending the catalog
+
+Edit `backend-cpp/data/catalog_seed.json` and bump `"version"`; the engine re-imports on its next start, or immediately with `--reseed`. Templates define reusable option categories. Vehicles list the templates they use, plus `drop` (remove options), `availability` (restrict an option to variants), `price_scale`, vehicle-specific `categories` and their `variants`. An option looks like this:
+
+```json
+{"code": "PF03", "name": "Performance Kit +45 hp", "price": 12900,
+ "requires": ["PF01", "PF02"], "excludes": [], "includes": [],
+ "mods": {"power_hp": 45, "accel_0_100_s": -0.2},
+ "visual": [{"role": "exhaust", "color": "#121314", "finish": "satin"}, {"part": "exhaust", "value": "quad"}]}
+```
+
+`requires` entries may list alternatives as `"A|B"`. Visual `role`s recolour materials, and `part`s change procedural geometry.

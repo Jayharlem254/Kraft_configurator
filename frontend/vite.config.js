@@ -10,4 +10,15 @@ export default defineConfig({
       "/media": "http://localhost:8000",
     },
   },
+  build: {
+    target: "es2020",
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        // three.js changes far less often than app code; keep it in its own
+        // long-cacheable chunk.
+        manualChunks: { three: ["three"] },
+      },
+    },
+  },
 });

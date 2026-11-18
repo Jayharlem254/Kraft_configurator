@@ -1,13 +1,20 @@
 #include "db.hpp"
-#include <iostream>
-#include <fstream>
+
+#include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <ctime>
+#include <iostream>
 #include <random>
 #include <sstream>
-#include <algorithm>
 
 namespace kraft {
+
+#define KRAFT_LOCK std::lock_guard<std::recursive_mutex> _kraft_lock(mutex_)
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
 
 std::string current_iso_time() {
     auto now = std::chrono::system_clock::now();
@@ -23,57 +30,151 @@ std::string current_iso_time() {
     return std::string(buf);
 }
 
+static std::mt19937_64& rng() {
+    static thread_local std::mt19937_64 gen{std::random_device{}()};
+    return gen;
+}
+
 std::string generate_uuid() {
-    static std::random_device rd;
-    static std::mt19937_64 gen(rd());
-    static std::uniform_int_distribution<uint64_t> dis;
-
-    uint64_t p1 = dis(gen);
-    uint64_t p2 = dis(gen);
-
-    // Set UUID version 4
+    std::uniform_int_distribution<uint64_t> dis;
+    uint64_t p1 = dis(rng());
+    uint64_t p2 = dis(rng());
     p1 = (p1 & 0xFFFFFFFFFFFF0FFFULL) | 0x0000000000004000ULL;
-    // Set variant (RFC 4122)
     p2 = (p2 & 0x3FFFFFFFFFFFFFFFULL) | 0x8000000000000000ULL;
-
     char buf[40];
-    std::snprintf(buf, sizeof(buf),
-                  "%08x-%04x-%04x-%04x-%012llx",
-                  static_cast<uint32_t>(p1 >> 32),
-                  static_cast<uint16_t>((p1 >> 16) & 0xFFFF),
-                  static_cast<uint16_t>(p1 & 0xFFFF),
-                  static_cast<uint16_t>(p2 >> 48),
+    std::snprintf(buf, sizeof(buf), "%08x-%04x-%04x-%04x-%012llx",
+                  static_cast<uint32_t>(p1 >> 32), static_cast<uint16_t>((p1 >> 16) & 0xFFFF),
+                  static_cast<uint16_t>(p1 & 0xFFFF), static_cast<uint16_t>(p2 >> 48),
                   static_cast<unsigned long long>(p2 & 0xFFFFFFFFFFFFULL));
     return std::string(buf);
 }
 
-Database::Database(const std::string& db_path) : db_path_(db_path) {}
-
-Database::~Database() {
-    close();
+std::string slugify(const std::string& s) {
+    std::string out;
+    bool dash = false;
+    for (unsigned char c : s) {
+        if (std::isalnum(c)) {
+            out += static_cast<char>(std::tolower(c));
+            dash = false;
+        } else if (!out.empty() && !dash) {
+            out += '-';
+            dash = true;
+        }
+    }
+    while (!out.empty() && out.back() == '-') out.pop_back();
+    return out;
 }
 
-bool Database::open() {
-    if (db_) return true;
+std::string join_csv(const std::vector<std::string>& v) {
+    std::string out;
+    for (size_t i = 0; i < v.size(); ++i) {
+        if (i) out += ',';
+        out += v[i];
+    }
+    return out;
+}
 
-    int rc = sqlite3_open(db_path_.c_str(), &db_);
-    if (rc != SQLITE_OK) {
-        std::cerr << "Failed to open SQLite database: " << sqlite3_errmsg(db_) << "\n";
-        if (db_) {
-            sqlite3_close(db_);
-            db_ = nullptr;
+std::vector<std::string> split_csv(const std::string& s) {
+    std::vector<std::string> out;
+    std::string cur;
+    for (char c : s) {
+        if (c == ',') {
+            if (!cur.empty()) out.push_back(cur);
+            cur.clear();
+        } else if (c != ' ') {
+            cur += c;
         }
+    }
+    if (!cur.empty()) out.push_back(cur);
+    return out;
+}
+
+static json parse_json_or(const std::string& text, json fallback) {
+    if (text.empty()) return fallback;
+    try {
+        return json::parse(text);
+    } catch (...) {
+        return fallback;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stmt
+// ---------------------------------------------------------------------------
+
+Stmt::Stmt(sqlite3* db, const char* sql) {
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt_, nullptr) != SQLITE_OK) {
+        std::cerr << "[SQLite] prepare failed: " << sqlite3_errmsg(db) << "\n  SQL: " << sql << "\n";
+        stmt_ = nullptr;
+    }
+}
+Stmt::~Stmt() {
+    if (stmt_) sqlite3_finalize(stmt_);
+}
+Stmt& Stmt::bind(int idx, const std::string& v) {
+    if (stmt_) sqlite3_bind_text(stmt_, idx, v.c_str(), static_cast<int>(v.size()), SQLITE_TRANSIENT);
+    return *this;
+}
+Stmt& Stmt::bind(int idx, int v) {
+    if (stmt_) sqlite3_bind_int(stmt_, idx, v);
+    return *this;
+}
+Stmt& Stmt::bind(int idx, double v) {
+    if (stmt_) sqlite3_bind_double(stmt_, idx, v);
+    return *this;
+}
+Stmt& Stmt::bind_null(int idx) {
+    if (stmt_) sqlite3_bind_null(stmt_, idx);
+    return *this;
+}
+Stmt& Stmt::bind_opt(int idx, const std::optional<std::string>& v) {
+    return (v && !v->empty()) ? bind(idx, *v) : bind_null(idx);
+}
+bool Stmt::row() { return stmt_ && sqlite3_step(stmt_) == SQLITE_ROW; }
+bool Stmt::exec() {
+    if (!stmt_) return false;
+    int rc = sqlite3_step(stmt_);
+    return rc == SQLITE_DONE || rc == SQLITE_ROW;
+}
+int Stmt::col_int(int i) const { return sqlite3_column_int(stmt_, i); }
+double Stmt::col_double(int i) const { return sqlite3_column_double(stmt_, i); }
+std::string Stmt::col_text(int i) const {
+    const unsigned char* t = sqlite3_column_text(stmt_, i);
+    return t ? reinterpret_cast<const char*>(t) : "";
+}
+std::optional<std::string> Stmt::col_opt(int i) const {
+    if (is_null(i)) return std::nullopt;
+    return col_text(i);
+}
+bool Stmt::is_null(int i) const { return sqlite3_column_type(stmt_, i) == SQLITE_NULL; }
+
+// ---------------------------------------------------------------------------
+// Database lifecycle & schema
+// ---------------------------------------------------------------------------
+
+Database::Database(std::string db_path) : db_path_(std::move(db_path)) {}
+Database::~Database() { close(); }
+
+bool Database::open() {
+    KRAFT_LOCK;
+    if (db_) return true;
+    if (sqlite3_open(db_path_.c_str(), &db_) != SQLITE_OK) {
+        std::cerr << "Failed to open SQLite database: " << sqlite3_errmsg(db_) << "\n";
+        sqlite3_close(db_);
+        db_ = nullptr;
         return false;
     }
-
-    // Enable foreign keys and WAL mode for high performance
     execute("PRAGMA foreign_keys = ON;");
     execute("PRAGMA journal_mode = WAL;");
-
-    return init_schema();
+    execute("PRAGMA synchronous = NORMAL;");
+    execute("PRAGMA temp_store = MEMORY;");
+    execute("PRAGMA cache_size = -16000;");  // 16 MB page cache
+    sqlite3_busy_timeout(db_, 3000);
+    return init_schema() && migrate();
 }
 
 void Database::close() {
+    KRAFT_LOCK;
     if (db_) {
         sqlite3_close(db_);
         db_ = nullptr;
@@ -81,18 +182,31 @@ void Database::close() {
 }
 
 bool Database::execute(const std::string& sql) {
-    char* err_msg = nullptr;
-    int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &err_msg);
-    if (rc != SQLITE_OK) {
-        std::cerr << "SQLite error executing SQL: " << (err_msg ? err_msg : "unknown") << "\nSQL: " << sql << "\n";
-        if (err_msg) sqlite3_free(err_msg);
+    char* err = nullptr;
+    if (sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &err) != SQLITE_OK) {
+        std::cerr << "[SQLite] " << (err ? err : "unknown error") << "\n";
+        if (err) sqlite3_free(err);
         return false;
     }
     return true;
 }
 
+bool Database::transaction(const std::function<bool()>& body) {
+    KRAFT_LOCK;
+    if (!execute("BEGIN IMMEDIATE;")) return false;
+    bool ok = false;
+    try {
+        ok = body();
+    } catch (const std::exception& e) {
+        std::cerr << "[SQLite] transaction aborted: " << e.what() << "\n";
+        ok = false;
+    }
+    execute(ok ? "COMMIT;" : "ROLLBACK;");
+    return ok;
+}
+
 bool Database::init_schema() {
-    const std::string schema = R"(
+    return execute(R"(
         CREATE TABLE IF NOT EXISTS vehicles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -107,7 +221,18 @@ bool Database::init_schema() {
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
-
+        CREATE TABLE IF NOT EXISTS variants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicle_id INTEGER NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+            code TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            price REAL NOT NULL DEFAULT 0.0,
+            specs TEXT DEFAULT '{}',
+            is_default INTEGER NOT NULL DEFAULT 0,
+            display_order INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(vehicle_id, code)
+        );
         CREATE TABLE IF NOT EXISTS option_categories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             vehicle_id INTEGER NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
@@ -117,7 +242,6 @@ bool Database::init_schema() {
             display_order INTEGER NOT NULL DEFAULT 0,
             UNIQUE(vehicle_id, slug)
         );
-
         CREATE TABLE IF NOT EXISTS option_choices (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             category_id INTEGER NOT NULL REFERENCES option_categories(id) ON DELETE CASCADE,
@@ -129,7 +253,6 @@ bool Database::init_schema() {
             is_default INTEGER NOT NULL DEFAULT 0,
             display_order INTEGER NOT NULL DEFAULT 0
         );
-
         CREATE TABLE IF NOT EXISTS configurations (
             id TEXT PRIMARY KEY,
             vehicle_id INTEGER NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
@@ -138,830 +261,574 @@ bool Database::init_schema() {
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
-
         CREATE TABLE IF NOT EXISTS configuration_selections (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             configuration_id TEXT NOT NULL REFERENCES configurations(id) ON DELETE CASCADE,
             option_id INTEGER NOT NULL REFERENCES option_choices(id) ON DELETE CASCADE,
             UNIQUE(configuration_id, option_id)
         );
-
-        CREATE INDEX IF NOT EXISTS idx_vehicles_slug ON vehicles(slug);
-        CREATE INDEX IF NOT EXISTS idx_vehicles_type ON vehicles(vehicle_type);
-        CREATE INDEX IF NOT EXISTS idx_config_session ON configurations(session_key);
-    )";
-
-    return execute(schema);
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+    )");
 }
 
-std::vector<Vehicle> Database::get_vehicles(const std::string& vehicle_type, bool published_only) {
-    std::vector<Vehicle> list;
-    std::string sql = "SELECT id, name, slug, vehicle_type, tagline, description, base_price, model_file, thumbnail, is_published, created_at, updated_at FROM vehicles WHERE 1=1";
-    
-    if (published_only) {
-        sql += " AND is_published = 1";
-    }
-    if (!vehicle_type.empty()) {
-        sql += " AND vehicle_type = ?";
-    }
-    sql += " ORDER BY vehicle_type ASC, name ASC";
-
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return list;
-    }
-
-    if (!vehicle_type.empty()) {
-        sqlite3_bind_text(stmt, 1, vehicle_type.c_str(), -1, SQLITE_STATIC);
-    }
-
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        Vehicle v;
-        v.id = sqlite3_column_int(stmt, 0);
-        v.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-        v.slug = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
-        v.vehicle_type = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-        const char* tag = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-        v.tagline = tag ? tag : "";
-        const char* desc = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
-        v.description = desc ? desc : "";
-        v.base_price = sqlite3_column_double(stmt, 6);
-        
-        if (sqlite3_column_type(stmt, 7) != SQLITE_NULL) {
-            v.model_file = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7));
-        }
-        if (sqlite3_column_type(stmt, 8) != SQLITE_NULL) {
-            v.thumbnail = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 8));
-        }
-        v.is_published = sqlite3_column_int(stmt, 9) != 0;
-        v.created_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 10));
-        v.updated_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 11));
-
-        list.push_back(v);
-    }
-    sqlite3_finalize(stmt);
-    return list;
-}
-
-std::vector<OptionCategory> Database::load_categories_for_vehicle(int vehicle_id) {
-    std::vector<OptionCategory> categories;
-
-    std::string sql = "SELECT id, vehicle_id, name, slug, selection_type, display_order FROM option_categories WHERE vehicle_id = ? ORDER BY display_order ASC, name ASC";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return categories;
-    }
-    sqlite3_bind_int(stmt, 1, vehicle_id);
-
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        OptionCategory cat;
-        cat.id = sqlite3_column_int(stmt, 0);
-        cat.vehicle_id = sqlite3_column_int(stmt, 1);
-        cat.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
-        cat.slug = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-        cat.selection_type = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-        cat.display_order = sqlite3_column_int(stmt, 5);
-        categories.push_back(cat);
-    }
-    sqlite3_finalize(stmt);
-
-    // Now load choices for each category
-    std::string choice_sql = "SELECT id, category_id, name, price_delta, swatch_hex, thumbnail, mesh_target, is_default, display_order FROM option_choices WHERE category_id = ? ORDER BY display_order ASC, name ASC";
-    for (auto& cat : categories) {
-        sqlite3_stmt* c_stmt = nullptr;
-        if (sqlite3_prepare_v2(db_, choice_sql.c_str(), -1, &c_stmt, nullptr) != SQLITE_OK) {
-            continue;
-        }
-        sqlite3_bind_int(c_stmt, 1, cat.id);
-
-        while (sqlite3_step(c_stmt) == SQLITE_ROW) {
-            OptionChoice choice;
-            choice.id = sqlite3_column_int(c_stmt, 0);
-            choice.category_id = sqlite3_column_int(c_stmt, 1);
-            choice.name = reinterpret_cast<const char*>(sqlite3_column_text(c_stmt, 2));
-            choice.price_delta = sqlite3_column_double(c_stmt, 3);
-            const char* hex = reinterpret_cast<const char*>(sqlite3_column_text(c_stmt, 4));
-            choice.swatch_hex = hex ? hex : "";
-            if (sqlite3_column_type(c_stmt, 5) != SQLITE_NULL) {
-                choice.thumbnail = reinterpret_cast<const char*>(sqlite3_column_text(c_stmt, 5));
-            }
-            const char* mesh = reinterpret_cast<const char*>(sqlite3_column_text(c_stmt, 6));
-            choice.mesh_target = mesh ? mesh : "";
-            choice.is_default = sqlite3_column_int(c_stmt, 7) != 0;
-            choice.display_order = sqlite3_column_int(c_stmt, 8);
-
-            cat.choices.push_back(choice);
-        }
-        sqlite3_finalize(c_stmt);
-    }
-
-    return categories;
-}
-
-std::optional<std::pair<Vehicle, std::vector<OptionCategory>>> Database::get_vehicle_by_slug(const std::string& slug) {
-    std::string sql = "SELECT id, name, slug, vehicle_type, tagline, description, base_price, model_file, thumbnail, is_published, created_at, updated_at FROM vehicles WHERE slug = ?";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return std::nullopt;
-    }
-    sqlite3_bind_text(stmt, 1, slug.c_str(), -1, SQLITE_STATIC);
-
-    if (sqlite3_step(stmt) != SQLITE_ROW) {
-        sqlite3_finalize(stmt);
-        return std::nullopt;
-    }
-
-    Vehicle v;
-    v.id = sqlite3_column_int(stmt, 0);
-    v.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-    v.slug = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
-    v.vehicle_type = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-    const char* tag = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-    v.tagline = tag ? tag : "";
-    const char* desc = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
-    v.description = desc ? desc : "";
-    v.base_price = sqlite3_column_double(stmt, 6);
-    if (sqlite3_column_type(stmt, 7) != SQLITE_NULL) {
-        v.model_file = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7));
-    }
-    if (sqlite3_column_type(stmt, 8) != SQLITE_NULL) {
-        v.thumbnail = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 8));
-    }
-    v.is_published = sqlite3_column_int(stmt, 9) != 0;
-    v.created_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 10));
-    v.updated_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 11));
-    sqlite3_finalize(stmt);
-
-    auto categories = load_categories_for_vehicle(v.id);
-    return std::make_pair(v, categories);
-}
-
-std::optional<Vehicle> Database::get_vehicle_by_id(int id) {
-    std::string sql = "SELECT id, name, slug, vehicle_type, tagline, description, base_price, model_file, thumbnail, is_published, created_at, updated_at FROM vehicles WHERE id = ?";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return std::nullopt;
-    }
-    sqlite3_bind_int(stmt, 1, id);
-
-    if (sqlite3_step(stmt) != SQLITE_ROW) {
-        sqlite3_finalize(stmt);
-        return std::nullopt;
-    }
-
-    Vehicle v;
-    v.id = sqlite3_column_int(stmt, 0);
-    v.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-    v.slug = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
-    v.vehicle_type = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-    const char* tag = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-    v.tagline = tag ? tag : "";
-    const char* desc = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
-    v.description = desc ? desc : "";
-    v.base_price = sqlite3_column_double(stmt, 6);
-    if (sqlite3_column_type(stmt, 7) != SQLITE_NULL) {
-        v.model_file = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7));
-    }
-    if (sqlite3_column_type(stmt, 8) != SQLITE_NULL) {
-        v.thumbnail = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 8));
-    }
-    v.is_published = sqlite3_column_int(stmt, 9) != 0;
-    v.created_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 10));
-    v.updated_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 11));
-    sqlite3_finalize(stmt);
-
-    return v;
-}
-
-bool Database::update_vehicle_model(int id, const std::string& model_file) {
-    std::string sql = "UPDATE vehicles SET model_file = ?, updated_at = ? WHERE id = ?";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return false;
-    }
-    std::string now = current_iso_time();
-    sqlite3_bind_text(stmt, 1, model_file.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, now.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_int(stmt, 3, id);
-    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    sqlite3_finalize(stmt);
-    return ok;
-}
-
-bool Database::update_vehicle_model_by_slug(const std::string& slug, const std::string& model_file) {
-    std::string sql = "UPDATE vehicles SET model_file = ?, updated_at = ? WHERE slug = ?";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return false;
-    }
-    std::string now = current_iso_time();
-    sqlite3_bind_text(stmt, 1, model_file.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, now.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, slug.c_str(), -1, SQLITE_STATIC);
-    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    sqlite3_finalize(stmt);
-    return ok;
-}
-
-std::optional<Vehicle> Database::create_vehicle(const std::string& name, const std::string& slug, const std::string& vehicle_type, const std::string& tagline, const std::string& description, double base_price, const std::string& model_file, bool is_published) {
-    std::string sql = "INSERT INTO vehicles (name, slug, vehicle_type, tagline, description, base_price, model_file, is_published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return std::nullopt;
-    }
-
-    std::string now = current_iso_time();
-    sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, slug.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, vehicle_type.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 4, tagline.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 5, description.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_double(stmt, 6, base_price);
-    if (!model_file.empty()) {
-        sqlite3_bind_text(stmt, 7, model_file.c_str(), -1, SQLITE_STATIC);
-    } else {
-        sqlite3_bind_null(stmt, 7);
-    }
-    sqlite3_bind_int(stmt, 8, is_published ? 1 : 0);
-    sqlite3_bind_text(stmt, 9, now.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 10, now.c_str(), -1, SQLITE_STATIC);
-
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-        sqlite3_finalize(stmt);
-        return std::nullopt;
-    }
-    int new_id = static_cast<int>(sqlite3_last_insert_rowid(db_));
-    sqlite3_finalize(stmt);
-
-    return get_vehicle_by_id(new_id);
-}
-
-bool Database::delete_vehicle(int id) {
-    std::string sql = "DELETE FROM vehicles WHERE id = ?";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return false;
-    }
-    sqlite3_bind_int(stmt, 1, id);
-    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    sqlite3_finalize(stmt);
-    return ok;
-}
-
-bool Database::clear_vehicle_model_by_file(const std::string& model_file) {
-    std::string sql = "UPDATE vehicles SET model_file = NULL, updated_at = ? WHERE model_file = ? OR model_file LIKE ?";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return false;
-    }
-    std::string now = current_iso_time();
-    std::string pattern = "%" + model_file;
-    sqlite3_bind_text(stmt, 1, now.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, model_file.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, pattern.c_str(), -1, SQLITE_STATIC);
-    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    sqlite3_finalize(stmt);
-    return ok;
-}
-
-bool Database::update_vehicle_details(int id, const std::string& name, const std::string& vehicle_type, const std::string& tagline, const std::string& description, double base_price) {
-    std::string sql = "UPDATE vehicles SET name = ?, vehicle_type = ?, tagline = ?, description = ?, base_price = ?, updated_at = ? WHERE id = ?";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return false;
-    }
-    std::string now = current_iso_time();
-    sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, vehicle_type.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, tagline.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 4, description.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_double(stmt, 5, base_price);
-    sqlite3_bind_text(stmt, 6, now.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_int(stmt, 7, id);
-    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    sqlite3_finalize(stmt);
-    return ok;
-}
-
-int Database::add_option_category(int vehicle_id, const std::string& name, const std::string& slug, const std::string& sel_type, int order) {
-    std::string sql = "INSERT INTO option_categories (vehicle_id, name, slug, selection_type, display_order) VALUES (?, ?, ?, ?, ?)";
-    sqlite3_stmt* s = nullptr;
-    int id = 0;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &s, nullptr) == SQLITE_OK) {
-        sqlite3_bind_int(s, 1, vehicle_id);
-        sqlite3_bind_text(s, 2, name.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_text(s, 3, slug.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_text(s, 4, sel_type.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_int(s, 5, order);
-        if (sqlite3_step(s) == SQLITE_DONE) {
-            id = static_cast<int>(sqlite3_last_insert_rowid(db_));
-        }
-        sqlite3_finalize(s);
-    }
-    return id;
-}
-
-int Database::add_option_choice(int category_id, const std::string& name, double delta, const std::string& hex, const std::string& mesh, bool is_default, int order) {
-    std::string sql = "INSERT INTO option_choices (category_id, name, price_delta, swatch_hex, mesh_target, is_default, display_order) VALUES (?, ?, ?, ?, ?, ?, ?)";
-    sqlite3_stmt* s = nullptr;
-    int id = 0;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &s, nullptr) == SQLITE_OK) {
-        sqlite3_bind_int(s, 1, category_id);
-        sqlite3_bind_text(s, 2, name.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_double(s, 3, delta);
-        sqlite3_bind_text(s, 4, hex.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_text(s, 5, mesh.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_int(s, 6, is_default ? 1 : 0);
-        sqlite3_bind_int(s, 7, order);
-        if (sqlite3_step(s) == SQLITE_DONE) {
-            id = static_cast<int>(sqlite3_last_insert_rowid(db_));
-        }
-        sqlite3_finalize(s);
-    }
-    return id;
-}
-
-bool Database::upsert_vehicle(const Vehicle& vehicle) {
-    if (vehicle.id > 0) {
-        std::string sql = "UPDATE vehicles SET name = ?, vehicle_type = ?, tagline = ?, description = ?, base_price = ?, model_file = ?, thumbnail = ?, is_published = ?, updated_at = ? WHERE id = ?";
-        sqlite3_stmt* stmt = nullptr;
-        if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return false;
-        std::string now = current_iso_time();
-        sqlite3_bind_text(stmt, 1, vehicle.name.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_text(stmt, 2, vehicle.vehicle_type.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_text(stmt, 3, vehicle.tagline.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_text(stmt, 4, vehicle.description.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_double(stmt, 5, vehicle.base_price);
-        if (vehicle.model_file.has_value()) {
-            sqlite3_bind_text(stmt, 6, vehicle.model_file->c_str(), -1, SQLITE_STATIC);
-        } else {
-            sqlite3_bind_null(stmt, 6);
-        }
-        if (vehicle.thumbnail.has_value()) {
-            sqlite3_bind_text(stmt, 7, vehicle.thumbnail->c_str(), -1, SQLITE_STATIC);
-        } else {
-            sqlite3_bind_null(stmt, 7);
-        }
-        sqlite3_bind_int(stmt, 8, vehicle.is_published ? 1 : 0);
-        sqlite3_bind_text(stmt, 9, now.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_int(stmt, 10, vehicle.id);
-        bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-        sqlite3_finalize(stmt);
-        return ok;
+bool Database::has_column(const std::string& table, const std::string& column) {
+    Stmt s(db_, ("PRAGMA table_info(" + table + ")").c_str());
+    while (s.row()) {
+        if (s.col_text(1) == column) return true;
     }
     return false;
 }
 
-std::vector<OptionChoice> Database::load_selected_options(const std::string& config_id) {
-    std::vector<OptionChoice> choices;
-    std::string sql = R"(
-        SELECT c.id, c.category_id, c.name, c.price_delta, c.swatch_hex, c.thumbnail, c.mesh_target, c.is_default, c.display_order
-        FROM option_choices c
-        JOIN configuration_selections s ON s.option_id = c.id
-        WHERE s.configuration_id = ?
-        ORDER BY c.category_id ASC, c.display_order ASC
-    )";
-
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return choices;
+void Database::ensure_column(const std::string& table, const std::string& column, const std::string& decl) {
+    if (!has_column(table, column)) {
+        execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + decl + ";");
     }
-    sqlite3_bind_text(stmt, 1, config_id.c_str(), -1, SQLITE_STATIC);
-
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        OptionChoice choice;
-        choice.id = sqlite3_column_int(stmt, 0);
-        choice.category_id = sqlite3_column_int(stmt, 1);
-        choice.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
-        choice.price_delta = sqlite3_column_double(stmt, 3);
-        const char* hex = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-        choice.swatch_hex = hex ? hex : "";
-        if (sqlite3_column_type(stmt, 5) != SQLITE_NULL) {
-            choice.thumbnail = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
-        }
-        const char* mesh = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
-        choice.mesh_target = mesh ? mesh : "";
-        choice.is_default = sqlite3_column_int(stmt, 7) != 0;
-        choice.display_order = sqlite3_column_int(stmt, 8);
-        choices.push_back(choice);
-    }
-    sqlite3_finalize(stmt);
-
-    return choices;
 }
 
-std::optional<Configuration> Database::get_configuration(const std::string& id) {
-    std::string sql = "SELECT id, vehicle_id, name, session_key, created_at, updated_at FROM configurations WHERE id = ?";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return std::nullopt;
-    }
-    sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
+// Additive, idempotent migrations — existing databases keep all their rows.
+bool Database::migrate() {
+    ensure_column("vehicles", "body_class", "TEXT DEFAULT ''");
+    ensure_column("vehicles", "family", "TEXT DEFAULT ''");
+    ensure_column("vehicles", "year", "INTEGER DEFAULT 0");
+    ensure_column("vehicles", "shape", "TEXT DEFAULT '{}'");
+    ensure_column("vehicles", "material_map", "TEXT DEFAULT '{}'");
+    ensure_column("vehicles", "source", "TEXT DEFAULT 'upload'");
+    ensure_column("vehicles", "display_order", "INTEGER DEFAULT 0");
 
-    if (sqlite3_step(stmt) != SQLITE_ROW) {
-        sqlite3_finalize(stmt);
-        return std::nullopt;
+    ensure_column("option_categories", "section", "TEXT DEFAULT 'exterior'");
+    ensure_column("option_categories", "display", "TEXT DEFAULT 'list'");
+    ensure_column("option_categories", "description", "TEXT DEFAULT ''");
+
+    ensure_column("option_choices", "code", "TEXT DEFAULT ''");
+    ensure_column("option_choices", "description", "TEXT DEFAULT ''");
+    ensure_column("option_choices", "finish", "TEXT DEFAULT ''");
+    ensure_column("option_choices", "visual", "TEXT DEFAULT '[]'");
+    ensure_column("option_choices", "mods", "TEXT DEFAULT '{}'");
+    ensure_column("option_choices", "requires_codes", "TEXT DEFAULT ''");
+    ensure_column("option_choices", "excludes_codes", "TEXT DEFAULT ''");
+    ensure_column("option_choices", "includes_codes", "TEXT DEFAULT ''");
+    ensure_column("option_choices", "variants", "TEXT DEFAULT ''");
+    ensure_column("option_choices", "tag", "TEXT DEFAULT ''");
+
+    ensure_column("configurations", "variant_id", "INTEGER DEFAULT 0");
+    ensure_column("configurations", "code", "TEXT DEFAULT ''");
+    ensure_column("configurations", "total_price", "REAL DEFAULT 0");
+    ensure_column("configurations", "snapshot", "TEXT DEFAULT '{}'");
+
+    // Legacy choices had no codes; give them stable ones so rules can address them.
+    execute("UPDATE option_choices SET code = 'OPT' || id WHERE code IS NULL OR code = '';");
+    // Legacy option categories: infer a section from their slug.
+    execute(R"(UPDATE option_categories SET display = 'swatch'
+               WHERE (slug LIKE '%color%' OR slug LIKE '%finish%' OR slug LIKE '%paint%' OR slug LIKE '%hull%')
+                 AND display = 'list';)");
+
+    return execute(R"(
+        CREATE INDEX IF NOT EXISTS idx_vehicles_slug ON vehicles(slug);
+        CREATE INDEX IF NOT EXISTS idx_vehicles_type ON vehicles(vehicle_type, body_class);
+        CREATE INDEX IF NOT EXISTS idx_variants_vehicle ON variants(vehicle_id);
+        CREATE INDEX IF NOT EXISTS idx_categories_vehicle ON option_categories(vehicle_id);
+        CREATE INDEX IF NOT EXISTS idx_choices_category ON option_choices(category_id);
+        CREATE INDEX IF NOT EXISTS idx_config_session ON configurations(session_key);
+        CREATE INDEX IF NOT EXISTS idx_config_code ON configurations(code);
+        CREATE INDEX IF NOT EXISTS idx_selections_config ON configuration_selections(configuration_id);
+    )");
+}
+
+// ---------------------------------------------------------------------------
+// Meta
+// ---------------------------------------------------------------------------
+
+std::string Database::get_meta(const std::string& key, const std::string& fallback) {
+    KRAFT_LOCK;
+    Stmt s(db_, "SELECT value FROM meta WHERE key = ?");
+    s.bind(1, key);
+    return s.row() ? s.col_text(0) : fallback;
+}
+
+void Database::set_meta(const std::string& key, const std::string& value) {
+    KRAFT_LOCK;
+    Stmt s(db_, "INSERT INTO meta(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+    s.bind(1, key).bind(2, value).exec();
+}
+
+// ---------------------------------------------------------------------------
+// Vehicles
+// ---------------------------------------------------------------------------
+
+static const char* VEHICLE_COLS =
+    "id, name, slug, vehicle_type, tagline, description, base_price, model_file, thumbnail, is_published, "
+    "created_at, updated_at, body_class, family, year, shape, material_map, source, display_order";
+
+static Vehicle read_vehicle(const Stmt& s) {
+    Vehicle v;
+    v.id = s.col_int(0);
+    v.name = s.col_text(1);
+    v.slug = s.col_text(2);
+    v.vehicle_type = s.col_text(3);
+    v.tagline = s.col_text(4);
+    v.description = s.col_text(5);
+    v.base_price = s.col_double(6);
+    v.model_file = s.col_opt(7);
+    if (v.model_file && v.model_file->empty()) v.model_file.reset();
+    v.thumbnail = s.col_opt(8);
+    v.is_published = s.col_int(9) != 0;
+    v.created_at = s.col_text(10);
+    v.updated_at = s.col_text(11);
+    v.body_class = s.col_text(12);
+    v.family = s.col_text(13);
+    v.year = s.col_int(14);
+    v.shape = parse_json_or(s.col_text(15), json::object());
+    v.material_map = parse_json_or(s.col_text(16), json::object());
+    v.source = s.col_text(17);
+    v.display_order = s.col_int(18);
+    return v;
+}
+
+std::vector<Vehicle> Database::get_vehicles(const std::string& vehicle_type, bool published_only) {
+    KRAFT_LOCK;
+    std::string sql = std::string("SELECT ") + VEHICLE_COLS + " FROM vehicles WHERE 1=1";
+    if (published_only) sql += " AND is_published = 1";
+    if (!vehicle_type.empty()) sql += " AND vehicle_type = ?";
+    sql += " ORDER BY vehicle_type ASC, display_order ASC, name ASC";
+    Stmt s(db_, sql.c_str());
+    if (!vehicle_type.empty()) s.bind(1, vehicle_type);
+    std::vector<Vehicle> out;
+    while (s.row()) out.push_back(read_vehicle(s));
+    return out;
+}
+
+std::optional<Vehicle> Database::get_vehicle_by_id(int id) {
+    KRAFT_LOCK;
+    Stmt s(db_, (std::string("SELECT ") + VEHICLE_COLS + " FROM vehicles WHERE id = ?").c_str());
+    s.bind(1, id);
+    if (!s.row()) return std::nullopt;
+    return read_vehicle(s);
+}
+
+std::optional<Vehicle> Database::get_vehicle_by_slug(const std::string& slug) {
+    KRAFT_LOCK;
+    Stmt s(db_, (std::string("SELECT ") + VEHICLE_COLS + " FROM vehicles WHERE slug = ?").c_str());
+    s.bind(1, slug);
+    if (!s.row()) return std::nullopt;
+    return read_vehicle(s);
+}
+
+int Database::count_vehicles() {
+    KRAFT_LOCK;
+    Stmt s(db_, "SELECT COUNT(*) FROM vehicles");
+    return s.row() ? s.col_int(0) : 0;
+}
+
+std::vector<Variant> Database::get_variants(int vehicle_id) {
+    KRAFT_LOCK;
+    Stmt s(db_,
+           "SELECT id, vehicle_id, code, name, description, price, specs, is_default, display_order "
+           "FROM variants WHERE vehicle_id = ? ORDER BY display_order ASC, price ASC");
+    s.bind(1, vehicle_id);
+    std::vector<Variant> out;
+    while (s.row()) {
+        Variant v;
+        v.id = s.col_int(0);
+        v.vehicle_id = s.col_int(1);
+        v.code = s.col_text(2);
+        v.name = s.col_text(3);
+        v.description = s.col_text(4);
+        v.price = s.col_double(5);
+        v.specs = parse_json_or(s.col_text(6), json::object());
+        v.is_default = s.col_int(7) != 0;
+        v.display_order = s.col_int(8);
+        out.push_back(std::move(v));
     }
+    return out;
+}
+
+static OptionChoice read_choice(const Stmt& s) {
+    OptionChoice c;
+    c.id = s.col_int(0);
+    c.category_id = s.col_int(1);
+    c.name = s.col_text(2);
+    c.price_delta = s.col_double(3);
+    c.swatch_hex = s.col_text(4);
+    c.thumbnail = s.col_opt(5);
+    c.mesh_target = s.col_text(6);
+    c.is_default = s.col_int(7) != 0;
+    c.display_order = s.col_int(8);
+    c.code = s.col_text(9);
+    c.description = s.col_text(10);
+    c.finish = s.col_text(11);
+    c.visual = parse_json_or(s.col_text(12), json::array());
+    if (!c.visual.is_array()) c.visual = json::array({c.visual});
+    c.mods = parse_json_or(s.col_text(13), json::object());
+    c.requires_codes = split_csv(s.col_text(14));
+    c.excludes_codes = split_csv(s.col_text(15));
+    c.includes_codes = split_csv(s.col_text(16));
+    c.variants = split_csv(s.col_text(17));
+    c.tag = s.col_text(18);
+
+    // Legacy rows: derive a visual binding from swatch + mesh_target.
+    if (c.visual.empty() && !c.swatch_hex.empty()) {
+        std::string role = "paint";
+        std::string mt = c.mesh_target;
+        std::transform(mt.begin(), mt.end(), mt.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+        if (mt.find("wheel") != std::string::npos || mt.find("rim") != std::string::npos) role = "rims";
+        else if (mt.find("interior") != std::string::npos || mt.find("seat") != std::string::npos) role = "interior";
+        else if (mt.find("aero") != std::string::npos || mt.find("trim") != std::string::npos) role = "trim";
+        else if (mt.find("hull") != std::string::npos) role = "hull";
+        else if (mt.find("deck") != std::string::npos) role = "deck";
+        json v = {{"role", role}, {"color", c.swatch_hex}};
+        if (!c.finish.empty()) v["finish"] = c.finish;
+        if (!c.mesh_target.empty()) v["target"] = c.mesh_target;
+        c.visual.push_back(v);
+    }
+    return c;
+}
+
+static const char* CHOICE_COLS =
+    "id, category_id, name, price_delta, swatch_hex, thumbnail, mesh_target, is_default, display_order, "
+    "code, description, finish, visual, mods, requires_codes, excludes_codes, includes_codes, variants, tag";
+
+std::vector<OptionCategory> Database::get_categories(int vehicle_id) {
+    KRAFT_LOCK;
+    std::vector<OptionCategory> cats;
+    {
+        Stmt s(db_,
+               "SELECT id, vehicle_id, name, slug, selection_type, display_order, section, display, description "
+               "FROM option_categories WHERE vehicle_id = ? ORDER BY display_order ASC, id ASC");
+        s.bind(1, vehicle_id);
+        while (s.row()) {
+            OptionCategory c;
+            c.id = s.col_int(0);
+            c.vehicle_id = s.col_int(1);
+            c.name = s.col_text(2);
+            c.slug = s.col_text(3);
+            c.selection_type = s.col_text(4);
+            c.display_order = s.col_int(5);
+            c.section = s.col_text(6);
+            c.display = s.col_text(7);
+            c.description = s.col_text(8);
+            if (c.section.empty()) c.section = "exterior";
+            if (c.display.empty()) c.display = "list";
+            cats.push_back(std::move(c));
+        }
+    }
+    if (cats.empty()) return cats;
+
+    // One query for every choice of the vehicle instead of one per category.
+    Stmt s(db_, (std::string("SELECT ") + CHOICE_COLS +
+                 " FROM option_choices WHERE category_id IN (SELECT id FROM option_categories WHERE vehicle_id = ?)"
+                 " ORDER BY display_order ASC, id ASC").c_str());
+    s.bind(1, vehicle_id);
+    while (s.row()) {
+        OptionChoice c = read_choice(s);
+        for (auto& cat : cats) {
+            if (cat.id == c.category_id) {
+                cat.choices.push_back(std::move(c));
+                break;
+            }
+        }
+    }
+    return cats;
+}
+
+std::optional<Vehicle> Database::insert_vehicle(const Vehicle& v) {
+    KRAFT_LOCK;
+    std::string now = current_iso_time();
+    Stmt s(db_,
+           "INSERT INTO vehicles (name, slug, vehicle_type, tagline, description, base_price, model_file, thumbnail, "
+           "is_published, created_at, updated_at, body_class, family, year, shape, material_map, source, display_order) "
+           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    s.bind(1, v.name).bind(2, v.slug).bind(3, v.vehicle_type).bind(4, v.tagline).bind(5, v.description)
+        .bind(6, v.base_price).bind_opt(7, v.model_file).bind_opt(8, v.thumbnail).bind(9, v.is_published ? 1 : 0)
+        .bind(10, now).bind(11, now).bind(12, v.body_class).bind(13, v.family).bind(14, v.year)
+        .bind(15, v.shape.dump()).bind(16, v.material_map.dump()).bind(17, v.source).bind(18, v.display_order);
+    if (!s.exec()) return std::nullopt;
+    return get_vehicle_by_id(static_cast<int>(sqlite3_last_insert_rowid(db_)));
+}
+
+bool Database::update_vehicle_core(const Vehicle& v) {
+    KRAFT_LOCK;
+    Stmt s(db_,
+           "UPDATE vehicles SET name = ?, vehicle_type = ?, tagline = ?, description = ?, base_price = ?, "
+           "model_file = ?, thumbnail = ?, is_published = ?, updated_at = ?, body_class = ?, family = ?, year = ?, "
+           "shape = ?, material_map = ?, source = ?, display_order = ? WHERE id = ?");
+    s.bind(1, v.name).bind(2, v.vehicle_type).bind(3, v.tagline).bind(4, v.description).bind(5, v.base_price)
+        .bind_opt(6, v.model_file).bind_opt(7, v.thumbnail).bind(8, v.is_published ? 1 : 0).bind(9, current_iso_time())
+        .bind(10, v.body_class).bind(11, v.family).bind(12, v.year).bind(13, v.shape.dump())
+        .bind(14, v.material_map.dump()).bind(15, v.source).bind(16, v.display_order).bind(17, v.id);
+    return s.exec();
+}
+
+bool Database::update_vehicle_model(int id, const std::string& model_file) {
+    KRAFT_LOCK;
+    Stmt s(db_, "UPDATE vehicles SET model_file = ?, updated_at = ? WHERE id = ?");
+    if (model_file.empty()) s.bind_null(1); else s.bind(1, model_file);
+    s.bind(2, current_iso_time()).bind(3, id);
+    return s.exec();
+}
+
+bool Database::update_vehicle_model_by_slug(const std::string& slug, const std::string& model_file) {
+    KRAFT_LOCK;
+    Stmt s(db_, "UPDATE vehicles SET model_file = ?, updated_at = ? WHERE slug = ?");
+    s.bind(1, model_file).bind(2, current_iso_time()).bind(3, slug);
+    return s.exec();
+}
+
+bool Database::clear_vehicle_model_by_file(const std::string& filename) {
+    KRAFT_LOCK;
+    Stmt s(db_, "UPDATE vehicles SET model_file = NULL, updated_at = ? WHERE model_file = ? OR model_file LIKE ?");
+    s.bind(1, current_iso_time()).bind(2, filename).bind(3, "%/" + filename);
+    return s.exec();
+}
+
+bool Database::delete_vehicle(int id) {
+    KRAFT_LOCK;
+    Stmt s(db_, "DELETE FROM vehicles WHERE id = ?");
+    s.bind(1, id);
+    return s.exec() && sqlite3_changes(db_) > 0;
+}
+
+int Database::insert_variant(int vehicle_id, const Variant& v) {
+    Stmt s(db_,
+           "INSERT INTO variants (vehicle_id, code, name, description, price, specs, is_default, display_order) "
+           "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    s.bind(1, vehicle_id).bind(2, v.code).bind(3, v.name).bind(4, v.description).bind(5, v.price)
+        .bind(6, v.specs.dump()).bind(7, v.is_default ? 1 : 0).bind(8, v.display_order);
+    return s.exec() ? static_cast<int>(sqlite3_last_insert_rowid(db_)) : 0;
+}
+
+bool Database::add_variant(int vehicle_id, const Variant& v) {
+    KRAFT_LOCK;
+    return insert_variant(vehicle_id, v) > 0;
+}
+
+int Database::insert_category(int vehicle_id, const OptionCategory& c) {
+    Stmt s(db_,
+           "INSERT INTO option_categories (vehicle_id, name, slug, selection_type, display_order, section, display, description) "
+           "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    s.bind(1, vehicle_id).bind(2, c.name).bind(3, c.slug).bind(4, c.selection_type).bind(5, c.display_order)
+        .bind(6, c.section).bind(7, c.display).bind(8, c.description);
+    return s.exec() ? static_cast<int>(sqlite3_last_insert_rowid(db_)) : 0;
+}
+
+int Database::insert_choice(int category_id, const OptionChoice& c) {
+    Stmt s(db_,
+           "INSERT INTO option_choices (category_id, name, price_delta, swatch_hex, thumbnail, mesh_target, is_default, "
+           "display_order, code, description, finish, visual, mods, requires_codes, excludes_codes, includes_codes, variants, tag) "
+           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    s.bind(1, category_id).bind(2, c.name).bind(3, c.price_delta).bind(4, c.swatch_hex).bind_opt(5, c.thumbnail)
+        .bind(6, c.mesh_target).bind(7, c.is_default ? 1 : 0).bind(8, c.display_order).bind(9, c.code)
+        .bind(10, c.description).bind(11, c.finish).bind(12, c.visual.dump()).bind(13, c.mods.dump())
+        .bind(14, join_csv(c.requires_codes)).bind(15, join_csv(c.excludes_codes)).bind(16, join_csv(c.includes_codes))
+        .bind(17, join_csv(c.variants)).bind(18, c.tag);
+    return s.exec() ? static_cast<int>(sqlite3_last_insert_rowid(db_)) : 0;
+}
+
+bool Database::replace_vehicle_content(int vehicle_id, const std::vector<Variant>& variants,
+                                       const std::vector<OptionCategory>& categories) {
+    return transaction([&]() {
+        {
+            Stmt d1(db_, "DELETE FROM variants WHERE vehicle_id = ?");
+            d1.bind(1, vehicle_id).exec();
+            Stmt d2(db_, "DELETE FROM option_categories WHERE vehicle_id = ?");
+            d2.bind(1, vehicle_id).exec();
+        }
+        int order = 0;
+        for (const auto& v : variants) {
+            Variant copy = v;
+            if (copy.display_order == 0) copy.display_order = ++order;
+            if (!insert_variant(vehicle_id, copy)) return false;
+        }
+        int cat_order = 0;
+        for (const auto& c : categories) {
+            OptionCategory copy = c;
+            if (copy.display_order == 0) copy.display_order = ++cat_order;
+            int cat_id = insert_category(vehicle_id, copy);
+            if (!cat_id) return false;
+            int choice_order = 0;
+            for (const auto& ch : c.choices) {
+                OptionChoice cc = ch;
+                if (cc.display_order == 0) cc.display_order = ++choice_order;
+                if (!insert_choice(cat_id, cc)) return false;
+            }
+        }
+        return true;
+    });
+}
+
+int Database::upsert_blueprint(const VehicleBlueprint& bp) {
+    KRAFT_LOCK;
+    auto existing = get_vehicle_by_slug(bp.vehicle.slug);
+    int id = 0;
+    if (existing) {
+        Vehicle v = bp.vehicle;
+        v.id = existing->id;
+        // Never clobber a model the user attached to a seeded vehicle.
+        if (existing->model_file && !v.model_file) v.model_file = existing->model_file;
+        if (!update_vehicle_core(v)) return 0;
+        id = v.id;
+    } else {
+        auto created = insert_vehicle(bp.vehicle);
+        if (!created) return 0;
+        id = created->id;
+    }
+    return replace_vehicle_content(id, bp.variants, bp.categories) ? id : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Configurations
+// ---------------------------------------------------------------------------
+
+std::string Database::unique_config_code() {
+    // Crockford-style alphabet: no I, L, O, U to stay readable when typed.
+    static const char* alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    std::uniform_int_distribution<int> dis(0, 31);
+    for (int attempt = 0; attempt < 16; ++attempt) {
+        std::string code = "K";
+        for (int i = 0; i < 7; ++i) code += alphabet[dis(rng())];
+        Stmt s(db_, "SELECT 1 FROM configurations WHERE code = ?");
+        s.bind(1, code);
+        if (!s.row()) return code;
+    }
+    return "K" + generate_uuid().substr(0, 8);
+}
+
+void Database::write_selections(const std::string& config_id, const std::vector<int>& option_ids) {
+    Stmt d(db_, "DELETE FROM configuration_selections WHERE configuration_id = ?");
+    d.bind(1, config_id).exec();
+    for (int opt_id : option_ids) {
+        Stmt s(db_, "INSERT OR IGNORE INTO configuration_selections (configuration_id, option_id) VALUES (?, ?)");
+        s.bind(1, config_id).bind(2, opt_id).exec();
+    }
+}
+
+std::vector<OptionChoice> Database::load_selected_options(const std::string& config_id) {
+    std::string sql = "SELECT ";
+    // Prefix choice columns with the table alias.
+    std::string cols = CHOICE_COLS;
+    std::stringstream ss(cols);
+    std::string col;
+    bool first = true;
+    while (std::getline(ss, col, ',')) {
+        col.erase(0, col.find_first_not_of(' '));
+        if (!first) sql += ", ";
+        sql += "c." + col;
+        first = false;
+    }
+    sql += " FROM option_choices c JOIN configuration_selections s ON s.option_id = c.id "
+           "WHERE s.configuration_id = ? ORDER BY c.category_id ASC, c.display_order ASC";
+    Stmt s(db_, sql.c_str());
+    s.bind(1, config_id);
+    std::vector<OptionChoice> out;
+    while (s.row()) out.push_back(read_choice(s));
+    return out;
+}
+
+std::optional<Configuration> Database::get_configuration(const std::string& id_or_code) {
+    KRAFT_LOCK;
+    Stmt s(db_,
+           "SELECT c.id, c.vehicle_id, c.name, c.session_key, c.created_at, c.updated_at, c.variant_id, c.code, "
+           "c.total_price, c.snapshot, v.slug, v.name, v.base_price, "
+           "COALESCE(var.code, ''), COALESCE(var.name, ''), COALESCE(var.price, -1) "
+           "FROM configurations c JOIN vehicles v ON v.id = c.vehicle_id "
+           "LEFT JOIN variants var ON var.id = c.variant_id "
+           "WHERE c.id = ? OR c.code = ? COLLATE NOCASE");
+    s.bind(1, id_or_code).bind(2, id_or_code);
+    if (!s.row()) return std::nullopt;
 
     Configuration cfg;
-    cfg.id = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-    cfg.vehicle_id = sqlite3_column_int(stmt, 1);
-    const char* name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
-    cfg.name = name ? name : "";
-    const char* sess = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-    cfg.session_key = sess ? sess : "";
-    cfg.created_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-    cfg.updated_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
-    sqlite3_finalize(stmt);
+    cfg.id = s.col_text(0);
+    cfg.vehicle_id = s.col_int(1);
+    cfg.name = s.col_text(2);
+    cfg.session_key = s.col_text(3);
+    cfg.created_at = s.col_text(4);
+    cfg.updated_at = s.col_text(5);
+    cfg.variant_id = s.col_int(6);
+    cfg.code = s.col_text(7);
+    cfg.total_price = s.col_double(8);
+    cfg.snapshot = parse_json_or(s.col_text(9), json::object());
+    cfg.vehicle_slug = s.col_text(10);
+    cfg.vehicle_name = s.col_text(11);
+    double vehicle_base = s.col_double(12);
+    cfg.variant_code = s.col_text(13);
+    cfg.variant_name = s.col_text(14);
+    double variant_price = s.col_double(15);
 
-    // Calculate total price: vehicle base price + option price deltas
-    auto v_opt = get_vehicle_by_id(cfg.vehicle_id);
-    double base = v_opt ? v_opt->base_price : 0.0;
     cfg.selected_options = load_selected_options(cfg.id);
-    cfg.total_price = base;
-    for (const auto& opt : cfg.selected_options) {
-        cfg.total_price += opt.price_delta;
+    if (cfg.total_price <= 0) {
+        // Legacy rows were never priced at save time.
+        cfg.total_price = variant_price >= 0 ? variant_price : vehicle_base;
+        for (const auto& o : cfg.selected_options) cfg.total_price += o.price_delta;
     }
-
     return cfg;
 }
 
 std::vector<Configuration> Database::get_configurations(const std::string& session_key) {
-    std::vector<Configuration> list;
-    std::string sql = "SELECT id FROM configurations";
-    if (!session_key.empty()) {
-        sql += " WHERE session_key = ?";
-    }
-    sql += " ORDER BY created_at DESC";
-
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return list;
-    }
-    if (!session_key.empty()) {
-        sqlite3_bind_text(stmt, 1, session_key.c_str(), -1, SQLITE_STATIC);
-    }
-
+    KRAFT_LOCK;
     std::vector<std::string> ids;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        ids.push_back(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+    {
+        std::string sql = "SELECT id FROM configurations";
+        if (!session_key.empty()) sql += " WHERE session_key = ?";
+        sql += " ORDER BY updated_at DESC LIMIT 200";
+        Stmt s(db_, sql.c_str());
+        if (!session_key.empty()) s.bind(1, session_key);
+        while (s.row()) ids.push_back(s.col_text(0));
     }
-    sqlite3_finalize(stmt);
-
+    std::vector<Configuration> out;
     for (const auto& id : ids) {
-        auto cfg = get_configuration(id);
-        if (cfg) {
-            list.push_back(*cfg);
-        }
+        if (auto c = get_configuration(id)) out.push_back(std::move(*c));
     }
-    return list;
+    return out;
 }
 
-std::optional<Configuration> Database::create_configuration(int vehicle_id, const std::vector<int>& option_ids, const std::string& session_key, const std::string& name) {
+std::optional<Configuration> Database::create_configuration(int vehicle_id, int variant_id, const std::vector<int>& option_ids,
+                                                            double total_price, const json& snapshot,
+                                                            const std::string& session_key, const std::string& name) {
+    KRAFT_LOCK;
     std::string id = generate_uuid();
-    std::string now = current_iso_time();
-
-    std::string sql = "INSERT INTO configurations (id, vehicle_id, name, session_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return std::nullopt;
-    }
-
-    sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_int(stmt, 2, vehicle_id);
-    sqlite3_bind_text(stmt, 3, name.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 4, session_key.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 5, now.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 6, now.c_str(), -1, SQLITE_STATIC);
-
-    int rc = sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-    if (rc != SQLITE_DONE) {
-        return std::nullopt;
-    }
-
-    // Insert selections
-    std::string sel_sql = "INSERT OR IGNORE INTO configuration_selections (configuration_id, option_id) VALUES (?, ?)";
-    for (int opt_id : option_ids) {
-        sqlite3_stmt* s_stmt = nullptr;
-        if (sqlite3_prepare_v2(db_, sel_sql.c_str(), -1, &s_stmt, nullptr) == SQLITE_OK) {
-            sqlite3_bind_text(s_stmt, 1, id.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_int(s_stmt, 2, opt_id);
-            sqlite3_step(s_stmt);
-            sqlite3_finalize(s_stmt);
-        }
-    }
-
+    bool ok = transaction([&]() {
+        std::string now = current_iso_time();
+        Stmt s(db_,
+               "INSERT INTO configurations (id, vehicle_id, name, session_key, created_at, updated_at, variant_id, code, "
+               "total_price, snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        s.bind(1, id).bind(2, vehicle_id).bind(3, name).bind(4, session_key).bind(5, now).bind(6, now)
+            .bind(7, variant_id).bind(8, unique_config_code()).bind(9, total_price).bind(10, snapshot.dump());
+        if (!s.exec()) return false;
+        write_selections(id, option_ids);
+        return true;
+    });
+    if (!ok) return std::nullopt;
     return get_configuration(id);
 }
 
-std::optional<Configuration> Database::update_configuration(const std::string& id, const std::vector<int>& option_ids) {
-    std::string now = current_iso_time();
-    std::string sql = "UPDATE configurations SET updated_at = ? WHERE id = ?";
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-        return std::nullopt;
-    }
-    sqlite3_bind_text(stmt, 1, now.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, id.c_str(), -1, SQLITE_STATIC);
-    sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-
-    // Replace selections
-    std::string del_sql = "DELETE FROM configuration_selections WHERE configuration_id = ?";
-    sqlite3_stmt* d_stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, del_sql.c_str(), -1, &d_stmt, nullptr) == SQLITE_OK) {
-        sqlite3_bind_text(d_stmt, 1, id.c_str(), -1, SQLITE_STATIC);
-        sqlite3_step(d_stmt);
-        sqlite3_finalize(d_stmt);
-    }
-
-    std::string sel_sql = "INSERT OR IGNORE INTO configuration_selections (configuration_id, option_id) VALUES (?, ?)";
-    for (int opt_id : option_ids) {
-        sqlite3_stmt* s_stmt = nullptr;
-        if (sqlite3_prepare_v2(db_, sel_sql.c_str(), -1, &s_stmt, nullptr) == SQLITE_OK) {
-            sqlite3_bind_text(s_stmt, 1, id.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_int(s_stmt, 2, opt_id);
-            sqlite3_step(s_stmt);
-            sqlite3_finalize(s_stmt);
-        }
-    }
-
-    return get_configuration(id);
+std::optional<Configuration> Database::update_configuration(const std::string& id, int variant_id, const std::vector<int>& option_ids,
+                                                            double total_price, const json& snapshot,
+                                                            const std::optional<std::string>& name) {
+    KRAFT_LOCK;
+    auto existing = get_configuration(id);
+    if (!existing) return std::nullopt;
+    bool ok = transaction([&]() {
+        Stmt s(db_,
+               "UPDATE configurations SET updated_at = ?, variant_id = ?, total_price = ?, snapshot = ?, "
+               "name = COALESCE(?, name) WHERE id = ?");
+        s.bind(1, current_iso_time()).bind(2, variant_id).bind(3, total_price).bind(4, snapshot.dump());
+        if (name) s.bind(5, *name); else s.bind_null(5);
+        s.bind(6, existing->id);
+        if (!s.exec()) return false;
+        write_selections(existing->id, option_ids);
+        return true;
+    });
+    if (!ok) return std::nullopt;
+    return get_configuration(existing->id);
 }
 
 bool Database::delete_configuration(const std::string& id) {
-    std::string del_selections = "DELETE FROM configuration_selections WHERE configuration_id = ?";
-    sqlite3_stmt* s1 = nullptr;
-    if (sqlite3_prepare_v2(db_, del_selections.c_str(), -1, &s1, nullptr) == SQLITE_OK) {
-        sqlite3_bind_text(s1, 1, id.c_str(), -1, SQLITE_STATIC);
-        sqlite3_step(s1);
-        sqlite3_finalize(s1);
-    }
-
-    std::string del_cfg = "DELETE FROM configurations WHERE id = ?";
-    sqlite3_stmt* s2 = nullptr;
-    if (sqlite3_prepare_v2(db_, del_cfg.c_str(), -1, &s2, nullptr) == SQLITE_OK) {
-        sqlite3_bind_text(s2, 1, id.c_str(), -1, SQLITE_STATIC);
-        int rc = sqlite3_step(s2);
-        sqlite3_finalize(s2);
-        return rc == SQLITE_DONE;
-    }
-    return false;
+    KRAFT_LOCK;
+    Stmt s(db_, "DELETE FROM configurations WHERE id = ? OR code = ? COLLATE NOCASE");
+    s.bind(1, id).bind(2, id);
+    return s.exec() && sqlite3_changes(db_) > 0;
 }
 
-std::pair<int, int> Database::import_manifest_file(const std::string& filepath, bool publish) {
-    int created = 0;
-    int updated = 0;
-
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open manifest file: " << filepath << "\n";
-        return {created, updated};
-    }
-
-    try {
-        nlohmann::json root;
-        file >> root;
-        if (!root.contains("assets") || !root["assets"].is_array()) {
-            std::cerr << "Manifest missing 'assets' array.\n";
-            return {created, updated};
-        }
-
-        std::string now = current_iso_time();
-
-        for (const auto& entry : root["assets"]) {
-            std::string name = entry.value("name", "");
-            std::string slug = entry.value("slug", "");
-            if (slug.empty() && !name.empty()) {
-                // simple slugify
-                for (char c : name) {
-                    if (std::isalnum(static_cast<unsigned char>(c))) slug += static_cast<char>(std::tolower(c));
-                    else if (c == ' ' || c == '-' || c == '_') slug += '-';
-                }
-            }
-            std::string vehicle_type = entry.value("vehicleType", "car");
-            std::string glb_path = entry.value("glbPath", "");
-            double base_price = entry.value("basePrice", 0.0);
-
-            // Check if vehicle exists
-            std::string check_sql = "SELECT id FROM vehicles WHERE slug = ?";
-            sqlite3_stmt* chk = nullptr;
-            bool exists = false;
-            int existing_id = 0;
-            if (sqlite3_prepare_v2(db_, check_sql.c_str(), -1, &chk, nullptr) == SQLITE_OK) {
-                sqlite3_bind_text(chk, 1, slug.c_str(), -1, SQLITE_STATIC);
-                if (sqlite3_step(chk) == SQLITE_ROW) {
-                    exists = true;
-                    existing_id = sqlite3_column_int(chk, 0);
-                }
-                sqlite3_finalize(chk);
-            }
-
-            if (exists) {
-                std::string upd_sql = "UPDATE vehicles SET name = ?, vehicle_type = ?, model_file = ?, base_price = ?, is_published = ?, updated_at = ? WHERE id = ?";
-                sqlite3_stmt* u_stmt = nullptr;
-                if (sqlite3_prepare_v2(db_, upd_sql.c_str(), -1, &u_stmt, nullptr) == SQLITE_OK) {
-                    sqlite3_bind_text(u_stmt, 1, name.c_str(), -1, SQLITE_STATIC);
-                    sqlite3_bind_text(u_stmt, 2, vehicle_type.c_str(), -1, SQLITE_STATIC);
-                    sqlite3_bind_text(u_stmt, 3, glb_path.c_str(), -1, SQLITE_STATIC);
-                    sqlite3_bind_double(u_stmt, 4, base_price);
-                    sqlite3_bind_int(u_stmt, 5, publish ? 1 : 0);
-                    sqlite3_bind_text(u_stmt, 6, now.c_str(), -1, SQLITE_STATIC);
-                    sqlite3_bind_int(u_stmt, 7, existing_id);
-                    sqlite3_step(u_stmt);
-                    sqlite3_finalize(u_stmt);
-                    updated++;
-                }
-            } else {
-                std::string ins_sql = "INSERT INTO vehicles (name, slug, vehicle_type, base_price, model_file, is_published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-                sqlite3_stmt* i_stmt = nullptr;
-                if (sqlite3_prepare_v2(db_, ins_sql.c_str(), -1, &i_stmt, nullptr) == SQLITE_OK) {
-                    sqlite3_bind_text(i_stmt, 1, name.c_str(), -1, SQLITE_STATIC);
-                    sqlite3_bind_text(i_stmt, 2, slug.c_str(), -1, SQLITE_STATIC);
-                    sqlite3_bind_text(i_stmt, 3, vehicle_type.c_str(), -1, SQLITE_STATIC);
-                    sqlite3_bind_double(i_stmt, 4, base_price);
-                    sqlite3_bind_text(i_stmt, 5, glb_path.c_str(), -1, SQLITE_STATIC);
-                    sqlite3_bind_int(i_stmt, 6, publish ? 1 : 0);
-                    sqlite3_bind_text(i_stmt, 7, now.c_str(), -1, SQLITE_STATIC);
-                    sqlite3_bind_text(i_stmt, 8, now.c_str(), -1, SQLITE_STATIC);
-                    sqlite3_step(i_stmt);
-                    sqlite3_finalize(i_stmt);
-                    created++;
-                }
-            }
-        }
-    } catch (const std::exception& ex) {
-        std::cerr << "JSON error parsing manifest: " << ex.what() << "\n";
-    }
-
-    return {created, updated};
-}
-
-void Database::seed_default_catalog_if_empty() {
-    std::string count_sql = "SELECT COUNT(*) FROM vehicles";
-    sqlite3_stmt* stmt = nullptr;
-    int count = 0;
-    if (sqlite3_prepare_v2(db_, count_sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
-            count = sqlite3_column_int(stmt, 0);
-        }
-        sqlite3_finalize(stmt);
-    }
-
-    if (count > 0) {
-        return; // already has data
-    }
-
-    std::cout << "[Database] Catalog is empty. Seeding default vehicles and options...\n";
-    std::string now = current_iso_time();
-
-    auto insert_vehicle = [&](const std::string& name, const std::string& slug, const std::string& type,
-                              const std::string& tagline, const std::string& desc, double base_price,
-                              const std::string& model_file = "") -> int {
-        std::string sql = "INSERT INTO vehicles (name, slug, vehicle_type, tagline, description, base_price, model_file, is_published, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)";
-        sqlite3_stmt* s = nullptr;
-        int id = 0;
-        if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &s, nullptr) == SQLITE_OK) {
-            sqlite3_bind_text(s, 1, name.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(s, 2, slug.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(s, 3, type.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(s, 4, tagline.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(s, 5, desc.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_double(s, 6, base_price);
-            if (!model_file.empty()) {
-                sqlite3_bind_text(s, 7, model_file.c_str(), -1, SQLITE_STATIC);
-            } else {
-                sqlite3_bind_null(s, 7);
-            }
-            sqlite3_bind_text(s, 8, now.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(s, 9, now.c_str(), -1, SQLITE_STATIC);
-            if (sqlite3_step(s) == SQLITE_DONE) {
-                id = static_cast<int>(sqlite3_last_insert_rowid(db_));
-            }
-            sqlite3_finalize(s);
-        }
-        return id;
-    };
-
-    auto insert_category = [&](int vehicle_id, const std::string& name, const std::string& slug, const std::string& sel_type, int order) -> int {
-        std::string sql = "INSERT INTO option_categories (vehicle_id, name, slug, selection_type, display_order) VALUES (?, ?, ?, ?, ?)";
-        sqlite3_stmt* s = nullptr;
-        int id = 0;
-        if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &s, nullptr) == SQLITE_OK) {
-            sqlite3_bind_int(s, 1, vehicle_id);
-            sqlite3_bind_text(s, 2, name.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(s, 3, slug.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(s, 4, sel_type.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_int(s, 5, order);
-            if (sqlite3_step(s) == SQLITE_DONE) {
-                id = static_cast<int>(sqlite3_last_insert_rowid(db_));
-            }
-            sqlite3_finalize(s);
-        }
-        return id;
-    };
-
-    auto insert_choice = [&](int category_id, const std::string& name, double delta, const std::string& hex, const std::string& mesh, bool is_default, int order) -> int {
-        std::string sql = "INSERT INTO option_choices (category_id, name, price_delta, swatch_hex, mesh_target, is_default, display_order) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        sqlite3_stmt* s = nullptr;
-        int id = 0;
-        if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &s, nullptr) == SQLITE_OK) {
-            sqlite3_bind_int(s, 1, category_id);
-            sqlite3_bind_text(s, 2, name.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_double(s, 3, delta);
-            sqlite3_bind_text(s, 4, hex.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_text(s, 5, mesh.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_int(s, 6, is_default ? 1 : 0);
-            sqlite3_bind_int(s, 7, order);
-            if (sqlite3_step(s) == SQLITE_DONE) {
-                id = static_cast<int>(sqlite3_last_insert_rowid(db_));
-            }
-            sqlite3_finalize(s);
-        }
-        return id;
-    };
-
-    // 1. Velora GT (Car)
-    int v1 = insert_vehicle("Velora GT", "velora-gt", "car",
-                            "Flagship electric grand tourer with active aero and cybernetic cockpit",
-                            "The Velora GT blends dual-motor instant torque with an ultra-rigid carbon-composite monocoque. Configurable aerodynamic wings and custom metallic finishes.",
-                            84000.0, "/media/models/velora-gt.glb");
-    if (v1 > 0) {
-        int c_col = insert_category(v1, "Exterior color", "exterior-color", "single", 1);
-        insert_choice(c_col, "Nebula Purple", 0.0, "#6d28d9", "Body_Paint", true, 1);
-        insert_choice(c_col, "Lunar Silver", 800.0, "#9a9aa6", "Body_Paint", false, 2);
-        insert_choice(c_col, "Void Black", 800.0, "#0c0b12", "Body_Paint", false, 3);
-        insert_choice(c_col, "Ion White", 600.0, "#f4f3f8", "Body_Paint", false, 4);
-
-        int c_whl = insert_category(v1, "Wheels", "wheels", "single", 2);
-        insert_choice(c_whl, "19in Aero", 0.0, "", "Wheel_Rim", true, 1);
-        insert_choice(c_whl, "20in Forged", 2200.0, "", "Wheel_Rim", false, 2);
-        insert_choice(c_whl, "21in Carbon", 4100.0, "", "Wheel_Rim", false, 3);
-
-        int c_int = insert_category(v1, "Interior", "interior", "single", 3);
-        insert_choice(c_int, "Graphite weave", 0.0, "#3a3a42", "Interior_Trim", true, 1);
-        insert_choice(c_int, "Violet leather", 1600.0, "#5b21b6", "Interior_Trim", false, 2);
-    }
-
-    // 2. Solace Roadster (Car)
-    int v2 = insert_vehicle("Solace Roadster", "solace-roadster", "car",
-                            "Open-top, low-slung, built for coastal canyon carving",
-                            "Pure analog driving feel combined with next-gen electronic stabilization and lightweight magnesium alloys.",
-                            96500.0);
-    if (v2 > 0) {
-        int c_col = insert_category(v2, "Exterior color", "exterior-color", "single", 1);
-        insert_choice(c_col, "Solar Flare Gold", 0.0, "#eab308", "Body_Paint", true, 1);
-        insert_choice(c_col, "Onyx Obsidian", 1200.0, "#111827", "Body_Paint", false, 2);
-        insert_choice(c_col, "Alpine Frost", 950.0, "#f8fafc", "Body_Paint", false, 3);
-
-        int c_whl = insert_category(v2, "Wheels", "wheels", "single", 2);
-        insert_choice(c_whl, "20in Sport", 0.0, "", "Wheel_Rim", true, 1);
-        insert_choice(c_whl, "21in Performance", 2800.0, "", "Wheel_Rim", false, 2);
-
-        int c_int = insert_category(v2, "Interior", "interior", "single", 3);
-        insert_choice(c_int, "Black Alcantara", 0.0, "#1e293b", "Interior_Trim", true, 1);
-        insert_choice(c_int, "Cognac Nappa", 2400.0, "#9a3412", "Interior_Trim", false, 2);
-    }
-
-    // 3. Marea 42 (Speed Boat)
-    int v3 = insert_vehicle("Marea 42", "marea-42", "boat",
-                            "42ft luxury offshore center console powerboat",
-                            "Engineered for heavy seas and triple-digit speed with dual step hull architecture and aerospace grade telemetry.",
-                            412000.0);
-    if (v3 > 0) {
-        int c_hull = insert_category(v3, "Hull finish", "hull-finish", "single", 1);
-        insert_choice(c_hull, "Arctic Pearl", 0.0, "#e2e8f0", "Hull_Gelcoat", true, 1);
-        insert_choice(c_hull, "Abyss Blue", 4500.0, "#1e3a8a", "Hull_Gelcoat", false, 2);
-        insert_choice(c_hull, "Titanium Gray", 3200.0, "#475569", "Hull_Gelcoat", false, 3);
-
-        int c_deck = insert_category(v3, "Decking", "decking", "single", 2);
-        insert_choice(c_deck, "Natural Teak", 0.0, "#b45309", "Deck_Surface", true, 1);
-        insert_choice(c_deck, "Synthetic CoolDeck", 6500.0, "#64748b", "Deck_Surface", false, 2);
-
-        int c_pwr = insert_category(v3, "Power", "power", "single", 3);
-        insert_choice(c_pwr, "Twin 450R", 0.0, "", "Engine_Bay", true, 1);
-        insert_choice(c_pwr, "Triple 450R Racing", 55000.0, "", "Engine_Bay", false, 2);
-    }
-
-    // 4. Nyx Streetfighter (Bike)
-    int v4 = insert_vehicle("Nyx Streetfighter", "nyx-streetfighter", "bike",
-                            "Naked hyper-naked street motorcycle with carbon chassis",
-                            "Raw aggressive stance, 208 horsepower V4 engine, integrated aerodynamic winglets, and race telemetry dashboard.",
-                            21800.0);
-    if (v4 > 0) {
-        int c_fair = insert_category(v4, "Fairing & Tank", "fairing-tank", "single", 1);
-        insert_choice(c_fair, "Stealth Matte Black", 0.0, "#18181b", "Body_Fairing", true, 1);
-        insert_choice(c_fair, "Neon Acid Green", 650.0, "#84cc16", "Body_Fairing", false, 2);
-        insert_choice(c_fair, "Cyber Violet", 750.0, "#8b5cf6", "Body_Fairing", false, 3);
-
-        int c_exh = insert_category(v4, "Exhaust System", "exhaust", "single", 2);
-        insert_choice(c_exh, "Stock Stainless", 0.0, "", "Exhaust_Pipe", true, 1);
-        insert_choice(c_exh, "Titanium Slip-on", 1450.0, "", "Exhaust_Pipe", false, 2);
-        insert_choice(c_exh, "Full Race Titanium System", 3200.0, "", "Exhaust_Pipe", false, 3);
-    }
-
-    std::cout << "[Database] Seeded 4 default vehicles with custom option sets.\n";
-}
-
-} // namespace kraft
+}  // namespace kraft
