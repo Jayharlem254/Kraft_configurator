@@ -1,0 +1,13 @@
+{
+  "name": "kraft-configurator",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Kraft Configurator — real-time 3D configurator for cars, motorcycles and boats with a C++ rules engine",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build:ui": "npm --prefix frontend run build",
+    "build:backend": "cmd /c \"cd backend-cpp && build.bat\"",
+    "build": "npm run build:ui && npm run build:backend",
+    "start": "run.bat"
+  }
+}
